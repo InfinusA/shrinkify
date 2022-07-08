@@ -1,5 +1,3 @@
-# Example Package
+# Shrinkify
 
-This is a simple example package. You can use
-[Github-flavored Markdown](https://guides.github.com/features/mastering-markdown/)
-to write your content.
+Media library converter for people who like pretty metadata
