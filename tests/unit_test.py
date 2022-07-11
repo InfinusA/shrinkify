@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import unittest
 import pathlib
 from shrinkify import metadata
@@ -9,6 +10,7 @@ class MetadataTester(unittest.TestCase):
         super().__init__(*args, **kwargs)
         self.ytm = metadata.youtube_music_metadata.YoutubeMusicMetadata()
         self.yt = metadata.youtube_metadata.YoutubeMetadata()
+        ShrinkifyConfig.MetadataRuntime.YoutubeMetadata.api_key = os.getenv("YT_API_KEY")
         self.fm = metadata.file_metadata.FileMetadata()
         
     def test_ytm_valid(self):

@@ -31,9 +31,18 @@ class Shrinkify(object):
     def single_convert(self, filename):
         file = pathlib.Path(filename).resolve()
         root = pathlib.Path('.').resolve().expanduser() if ShrinkifyConfig.source_folder is None else pathlib.Path(ShrinkifyConfig.source_folder).resolve()
-        # root = root.resolve()
         output_folder = pathlib.Path(root, 'compressed').expanduser().resolve() if ShrinkifyConfig.output_folder is None else pathlib.Path(ShrinkifyConfig.output_folder)
         output_file = pathlib.Path(output_folder, file.relative_to(root).with_suffix('.m4a'))
+        
+        if output_folder in file.parents: #file is the compressed ver
+            output_file = file
+            basename = file.stem
+            relative_parents = file.relative_to(output_folder).parent
+            real_dir = pathlib.Path(root, relative_parents)
+            try:
+                file = next(real_dir.glob(f"{basename}.*"))
+            except StopIteration:
+                raise RuntimeError("Parent file not found. Does the source exist?")
         
         metadata = self.meta_parser.parse(file, no_cache=True)
         pprint.pprint(metadata)
