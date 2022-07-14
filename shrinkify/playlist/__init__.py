@@ -7,6 +7,7 @@ from urllib.parse import quote
 import dbus
 
 from ..config import ShrinkifyConfig
+from ..metadata import MetadataProcessor
 # from . import arch, grass, rain
 
 PLAYLIST_TEMPLATE = {
@@ -93,6 +94,7 @@ class PlaylistGenerator(object):
         self.playlist_root = pathlib.Path(ShrinkifyConfig.output_folder).resolve()
         self.exclude = ShrinkifyConfig.PlaylistRuntime.exclude
         self.filetypes = ShrinkifyConfig.filetypes
+        self.metadata = MetadataProcessor()
     
     def create_playlists(self) -> None:
         #get playlist jsons
@@ -124,28 +126,24 @@ class PlaylistGenerator(object):
                 continue
             if neg_filter and any(((f in file.name) or (f in file.parts) for f in neg_filter)):
                 continue
-            for title in pos_filter:
-                if isinstance(title, str):
-                    if title.lower() in str(file).lower():
-                        # logging.debug(f"Added {file.name} to playlist")
-                        yield file
-                        break
-                
-                elif isinstance(title, dict):
-                    if title['exec'] == 'regex' and re.match(title['regex'], file.name.lower()):
-                        # logging.debug(f"Added {file.name} to playlist")
-                        yield file
-                        break
-                  
-                elif hasattr(title, '__call__'): #title is callable. Should return bool value
-                    if title(str(file)):
-                        # logging.debug(f"Added {file.name} to playlist")
-                        yield file
-                        break
+            
+            song_metadata = self.metadata.parse(file)
+            
+            if self.match_titles((str(file), song_metadata['title']), pos_filter):
+                yield file
                     
             if not pos_filter:
                 # logging.debug(f"Added {file.name} to playlist")
                 yield file
+    
+    @staticmethod
+    def match_titles(titles, matches):
+        for title in titles:
+            for match in matches:
+                if match in title or re.match(match, title):
+                    return True
+        else:
+            return False
         
     # def playlist_general(self) -> pathlib.Path:
     #     long_songs = (
