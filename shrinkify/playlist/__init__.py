@@ -101,22 +101,15 @@ class PlaylistGenerator(object):
         #dunno why config is in yaml but playlist in json but eh whatever
         logging.debug(f"Playlist mode is {'quoted' if ShrinkifyConfig.PlaylistRuntime.escape_codes else 'unquoted'}")
         playlist_list = ShrinkifyConfig.PlaylistRuntime.playlist_skeletion_dir.glob("*.json")
+        playlist_data = {}
         for playlist in playlist_list:
             logging.debug(f"Parsing json for playlist: {playlist.name}")
-            playlist_data = json.loads(playlist.read_text())
-            logging.info(f"Formatting playlist {playlist_data['title']}")
-            output_file = pathlib.Path(ShrinkifyConfig.output_folder, f'{playlist_data["title"]}.m3u8')
-            with output_file.open('w+') as op:
-                for song in self.playlist_generic(playlist_data['exclude'], playlist_data['include']):
-                    relative_song = song.relative_to(self.playlist_root)
-                    output_string = f"{quote(str(relative_song)).replace('%2F', '/')}\n" if ShrinkifyConfig.PlaylistRuntime.escape_codes \
-                        else f"{relative_song}\n"# else f"{str(relative_song).replace('#', '%23')}\n"
-                        
-                    op.write(output_string)
-                
-    def playlist_generic(self, neg_filter=[], pos_filter=[]) -> pathlib.Path:
+            playlist_data[playlist.name] = json.loads(playlist.read_text())
+            
+        output_playlists = {x: [] for x in playlist_data.keys()}
+        
         for file in self.playlist_root.rglob("*"):
-            # logging.debug(f"Processing file {file.name}")
+            logging.debug(f"Processing file {file.name}")
             if file.is_dir():
                 continue
             if self.filetypes is not None and file.suffix not in self.filetypes:
@@ -124,23 +117,71 @@ class PlaylistGenerator(object):
             if set(self.exclude).intersection(set(file.parts)):
                 print("HI", set(self.exclude).intersection(set(file.parts)))
                 continue
-            if neg_filter and any(((f in file.name) or (f in file.parts) for f in neg_filter)):
-                continue
+            # song_metadata = self.metadata.fetch(file, no_thumb=True) #only parse builtin metadata
+            for (playlist_name, filters) in playlist_data.items():
+                pos_filter = filters['include']
+                neg_filter = filters['exclude']
+                
+                if not pos_filter and not neg_filter: #speed up
+                    output_playlists[playlist_name].append(file)
+                
+                if neg_filter and any(((f in file.name) or (f in file.parts) for f in neg_filter)):
+                    continue
+                
+                # if self.match_titles((str(file), song_metadata['title']), pos_filter):
+                if self.match_titles((str(file),), pos_filter):
+                    output_playlists[playlist_name].append(file)
+                        
+                elif not pos_filter:
+                    # logging.debug(f"Added {file.name} to playlist")
+                    output_playlists[playlist_name].append(file)
             
-            song_metadata = self.metadata.fetch(file) #only parse builtin metadata
+        for playlist, playlist_items in output_playlists.items():
+            output_file = pathlib.Path(ShrinkifyConfig.output_folder, f'{playlist_data[playlist]["title"]}.m3u8')
+            with output_file.open('w+') as op:
+                for song in playlist_items:
+                    relative_song = song.relative_to(self.playlist_root)
+                    output_string = f"{quote(str(relative_song)).replace('%2F', '/')}\n" if ShrinkifyConfig.PlaylistRuntime.escape_codes \
+                        else f"{relative_song}\n"# else f"{str(relative_song).replace('#', '%23')}\n"
+                        
+                    op.write(output_string)
+            # logging.info(f"Formatting playlist {playlist_data['title']}")
+            # output_file = pathlib.Path(ShrinkifyConfig.output_folder, f'{playlist_data["title"]}.m3u8')
+            # with output_file.open('w+') as op:
+            #     for song in self.playlist_generic(playlist_data['exclude'], playlist_data['include']):
+            #         relative_song = song.relative_to(self.playlist_root)
+            #         output_string = f"{quote(str(relative_song)).replace('%2F', '/')}\n" if ShrinkifyConfig.PlaylistRuntime.escape_codes \
+            #             else f"{relative_song}\n"# else f"{str(relative_song).replace('#', '%23')}\n"
+                        
+            #         op.write(output_string)
+                
+    # def playlist_generic(self, neg_filter=[], pos_filter=[]) -> pathlib.Path:
+    #     for file in self.playlist_root.rglob("*"):
+    #         logging.debug(f"Processing file {file.name}")
+    #         if file.is_dir():
+    #             continue
+    #         if self.filetypes is not None and file.suffix not in self.filetypes:
+    #             continue
+    #         if set(self.exclude).intersection(set(file.parts)):
+    #             print("HI", set(self.exclude).intersection(set(file.parts)))
+    #             continue
+    #         if neg_filter and any(((f in file.name) or (f in file.parts) for f in neg_filter)):
+    #             continue
             
-            if self.match_titles((str(file), song_metadata['title']), pos_filter):
-                yield file
+    #         song_metadata = self.metadata.fetch(file, no_thumb=True) #only parse builtin metadata
+            
+    #         if self.match_titles((str(file), song_metadata['title']), pos_filter):
+    #             yield file
                     
-            if not pos_filter:
-                # logging.debug(f"Added {file.name} to playlist")
-                yield file
+    #         if not pos_filter:
+    #             # logging.debug(f"Added {file.name} to playlist")
+    #             yield file
     
     @staticmethod
     def match_titles(titles, matches):
         for title in titles:
             for match in matches:
-                if match in title or re.match(match, title):
+                if match in title:
                     return True
         else:
             return False

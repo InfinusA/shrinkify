@@ -9,7 +9,7 @@ FFPROBE_METADATA = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_fo
 FFMPEGTHUMBNAILER = ['ffmpegthumbnailer', '-i', None, '-o', '-', '-s0', '-c', 'png', '-m']
 
 class FileMetadata(object):
-    def fetch(self, file):
+    def fetch(self, file, no_thumb=False):
         if not isinstance(file, pathlib.Path):
             file = pathlib.Path(file)
         file_metadata_raw = subprocess.check_output(FFPROBE_METADATA+[str(file.resolve())]).decode('utf8')
@@ -23,22 +23,23 @@ class FileMetadata(object):
         self.remove_tag(tags, 'major_brand')
         self.remove_tag(tags, 'minor_brand')
         shrinkify_metadata = tags
-        try:
-            this_thumbnail_command = FFMPEGTHUMBNAILER
-            this_thumbnail_command[2] = str(file.resolve())
-            thumbnail_raw = subprocess.check_output(this_thumbnail_command, stderr=subprocess.DEVNULL)
-            thumbnail = shrink_utils.data_to_thumbnail(thumbnail_raw)
-        except subprocess.CalledProcessError:
-            cover_art = pathlib.Path(file.parent, 'cover.png')
-            if cover_art.exists():
-                thumbnail = shrink_utils.data_to_thumbnail(cover_art.read_bytes())
-            else:
-                if ShrinkifyConfig.MetadataRuntime.ThumbnailGenerator.enabled:
-                    title = shrinkify_metadata['title'] if 'title' in shrinkify_metadata else file.stem
-                    thumbnail = shrink_utils.custom_thumbnail_generator(title, font=ShrinkifyConfig.MetadataRuntime.ThumbnailGenerator.font, font_size=ShrinkifyConfig.MetadataRuntime.ThumbnailGenerator.font_size, base_image=ShrinkifyConfig.MetadataRuntime.ThumbnailGenerator.base_image)
+        if not no_thumb:
+            try:
+                this_thumbnail_command = FFMPEGTHUMBNAILER
+                this_thumbnail_command[2] = str(file.resolve())
+                thumbnail_raw = subprocess.check_output(this_thumbnail_command, stderr=subprocess.DEVNULL)
+                thumbnail = shrink_utils.data_to_thumbnail(thumbnail_raw)
+            except subprocess.CalledProcessError:
+                cover_art = pathlib.Path(file.parent, 'cover.png')
+                if cover_art.exists():
+                    thumbnail = shrink_utils.data_to_thumbnail(cover_art.read_bytes())
                 else:
-                    thumbnail = None
-        shrinkify_metadata['_thumbnail_image'] = thumbnail
+                    if ShrinkifyConfig.MetadataRuntime.ThumbnailGenerator.enabled:
+                        title = shrinkify_metadata['title'] if 'title' in shrinkify_metadata else file.stem
+                        thumbnail = shrink_utils.custom_thumbnail_generator(title, font=ShrinkifyConfig.MetadataRuntime.ThumbnailGenerator.font, font_size=ShrinkifyConfig.MetadataRuntime.ThumbnailGenerator.font_size, base_image=ShrinkifyConfig.MetadataRuntime.ThumbnailGenerator.base_image)
+                    else:
+                        thumbnail = None
+            shrinkify_metadata['_thumbnail_image'] = thumbnail
         if 'title' not in shrinkify_metadata:
             shrinkify_metadata['title'] = file.stem
         if 'artist' not in shrinkify_metadata:
