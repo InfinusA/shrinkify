@@ -7,7 +7,7 @@ from urllib.parse import quote
 import dbus
 
 from ..config import ShrinkifyConfig
-from ..metadata import MetadataProcessor
+from ..metadata.file_metadata import FileMetadata
 # from . import arch, grass, rain
 
 PLAYLIST_TEMPLATE = {
@@ -94,7 +94,7 @@ class PlaylistGenerator(object):
         self.playlist_root = pathlib.Path(ShrinkifyConfig.output_folder).resolve()
         self.exclude = ShrinkifyConfig.PlaylistRuntime.exclude
         self.filetypes = ShrinkifyConfig.filetypes
-        self.metadata = MetadataProcessor()
+        self.metadata = FileMetadata()
     
     def create_playlists(self) -> None:
         #get playlist jsons
@@ -127,7 +127,7 @@ class PlaylistGenerator(object):
             if neg_filter and any(((f in file.name) or (f in file.parts) for f in neg_filter)):
                 continue
             
-            song_metadata = self.metadata.parse(file)
+            song_metadata = self.metadata.fetch(file) #only parse builtin metadata
             
             if self.match_titles((str(file), song_metadata['title']), pos_filter):
                 yield file
