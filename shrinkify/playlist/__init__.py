@@ -124,6 +124,7 @@ class PlaylistGenerator(object):
                 
                 if not pos_filter and not neg_filter: #speed up
                     output_playlists[playlist_name].append(file)
+                    continue
                 
                 if neg_filter and any(((f in file.name) or (f in file.parts) for f in neg_filter)):
                     continue
@@ -131,10 +132,12 @@ class PlaylistGenerator(object):
                 # if self.match_titles((str(file), song_metadata['title']), pos_filter):
                 if self.match_titles((str(file),), pos_filter):
                     output_playlists[playlist_name].append(file)
+                    continue
                         
                 elif not pos_filter:
                     # logging.debug(f"Added {file.name} to playlist")
                     output_playlists[playlist_name].append(file)
+                    continue
             
         for playlist, playlist_items in output_playlists.items():
             output_file = pathlib.Path(ShrinkifyConfig.output_folder, f'{playlist_data[playlist]["title"]}.m3u8')
