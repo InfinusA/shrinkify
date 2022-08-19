@@ -26,9 +26,12 @@ class YoutubeMusicMetadata(object):
         
         #load override
         original_id = source_id
-        if [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_song if source_id  == o[0]]:
-            original_id = source_id
-            source_id = [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_song if source_id in o][0][1]
+        try:
+            if [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_song if source_id  == o[0]]:
+                original_id = source_id
+                source_id = [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_song if source_id in o][0][1]
+        except KeyError:
+            return False
         # if ShrinkifyConfig.cache and ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_enabled:
         #     override_file = pathlib.Path(ShrinkifyConfig.cache, 'ytmusic_overrides.json')
         #     with override_file.open('r') as of:
@@ -45,10 +48,13 @@ class YoutubeMusicMetadata(object):
         if song_info['playabilityStatus']['status'] in ('UNPLAYABLE', 'ERROR'):
             return False
         
-        if [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_artist if song_info['videoDetails']['channelId']  == o[0]]:
-            artist_id = [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_artist if song_info['videoDetails']['channelId'] in o][0][1]
-        else:
-            artist_id = song_info['videoDetails']['channelId']
+        try:
+            if [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_artist if song_info['videoDetails']['channelId']  == o[0]]:
+                artist_id = [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_artist if song_info['videoDetails']['channelId'] in o][0][1]
+            else:
+                artist_id = song_info['videoDetails']['channelId']
+        except KeyError:
+            return False
         try:
             artist_info = self.ytm.get_artist(artist_id)
         except (KeyError, ValueError):
@@ -76,10 +82,20 @@ class YoutubeMusicMetadata(object):
                         target_song = song
                         target_album = album
                         break
-
                 #2nd break
                 if songfound:
                     break
+                
+                if ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.name_match:
+                    for song in album_songs['tracks']:
+                        if song_info['videoDetails']['title'] == song['title']: #some songs are strange and the url links to the original, not the yt music ver
+                            logging.info(f"{source_id}: Found song in album")
+                            songfound = True
+                            target_song = song
+                            target_album = album
+                            break
+                    if songfound:
+                        break
         
         if not songfound and 'singles' in artist_info:
             logging.info(f"{source_id}: Searching singles")
@@ -90,15 +106,24 @@ class YoutubeMusicMetadata(object):
             for song in songs:
                 song_data = self.ytm.get_album(song['browseId'])
                 for track in song_data['tracks']: #acts similarly to an album
-                    if track['videoId'] in (source_id, original_id) or (ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.name_match and song_info['videoDetails']['title'] == track['title']): #some songs are strange and the url links to the original, not the yt music ver
+                    if track['videoId'] in (source_id, original_id): #some songs are strange and the url links to the original, not the yt music ver
                         logging.info(f"{source_id}: Found single")
                         songfound = True
                         target_song = track
                         target_album = song
                         break
-                    
                 if songfound:
                     break
+                
+                if ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.name_match:
+                    for track in song_data['tracks']:
+                        if song_info['videoDetails']['title'] == track['title']:
+                            songfound = True
+                            target_song = track
+                            target_album = song
+                            break
+                    if songfound:
+                        break
                     
         if not songfound: #no song found at all
             logging.info(f"{source_id}: No song found")

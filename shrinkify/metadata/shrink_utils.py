@@ -6,17 +6,25 @@ from io import BytesIO
 
 from ..config import ShrinkifyConfig
 def match_yt_id(filename):
-    yt_match = re.search('\-[a-zA-Z0-9\-_]{11}\.', str(filename))
+    yt_match = re.search('\-([a-zA-Z0-9\-_]{11})\.', str(filename))
+    if not yt_match:
+        yt_match = re.search('\[([a-zA-Z0-9\-_]{11})\].', str(filename))
     if not yt_match:
         return yt_match
     else:
-        yt_id = yt_match.group(0)
-        return yt_id[1:-1]
+        yt_id = yt_match.group(1)
+        return yt_id
 
 def custom_thumbnail_generator(title, font=None, font_size=100, base_image=None):
     base_image = str(base_image)
-    font = ImageFont.load_default() if font is None else ImageFont.truetype(font, font_size)
-    final_thumbnail = Image.new('RGBA', (1000, 1000), color='#525252') if base_image is None else Image.open(base_image)
+    try:
+        font = ImageFont.load_default() if font is None else ImageFont.truetype(font, font_size)
+    except OSError:
+        font = ImageFont.load_default()
+    try:
+        final_thumbnail = Image.new('RGBA', (1000, 1000), color='#525252') if base_image is None else Image.open(base_image)
+    except FileNotFoundError:
+        final_thumbnail = Image.new('RGBA', (1000, 1000), color='#525252')
     ftd = ImageDraw.Draw(final_thumbnail)
     title_text = title[:14]
     if len(title) > 14:

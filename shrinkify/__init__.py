@@ -113,7 +113,7 @@ class Shrinkify(object):
             #continue scripts
             print(f"Converting {file.relative_to(root)}")
             # logging.debug(file)
-            
+            print("Fetching metadata")
             metadata = self.meta_parser.parse(file)
             thumb_data = BytesIO()
             # metadata['_thumbnail_image'].save(thumb_data, format='png')
@@ -141,6 +141,7 @@ class Shrinkify(object):
                 ffmpeg_args.append('-metadata')
                 ffmpeg_args.append(metadata_val)
             ffmpeg_args.append(str(output_file))
+            print("Converting File")
             if ShrinkifyConfig.flag_debug:
                 print("About to run ffmpeg")
                 ffmpeg = subprocess.Popen(ffmpeg_args, stdin=subprocess.PIPE)

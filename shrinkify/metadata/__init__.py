@@ -33,16 +33,21 @@ class MetadataProcessor(object):
             music_res = self.ytm_parser.fetch(file_yt, no_cache=no_cache)
             if not music_res:
                 file_metadata = self.yt_parser.fetch(file_yt, no_cache=no_cache)
+                if file_metadata:
+                    print('Using YouTube parser')
             elif self.ytm_comments:
                 file_metadata = music_res
                 file_metadata['comment'] = self.yt_parser.fetch(file_yt, no_thumb=True, no_cache=no_cache)['comment']
+                print('Using YT Music parser with YouTube comments')
             else:
                 file_metadata = music_res
+                print('Using YT Music parser')
                 
         
-        if file_metadata == False: #nothing's worked so far, so fallback to default file parser
+        if not file_metadata: #nothing's worked so far, so fallback to default file parser
             file_metadata = self.fm_parser.fetch(file) #Note that files have no cache, as the extra cpu time isn't worth the storage space
-        
+            print('Using file parser')
+            
         return file_metadata    
         
 

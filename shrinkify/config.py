@@ -2,8 +2,11 @@
 import logging
 import pathlib
 import yaml
+import os
 
 class NestedNamespace(object):
+    """Namespace with special __setattr__ function
+    """
     def __setattr__(self, name, value):
         if '.' in name:
             group,name = name.split('.',1)
@@ -17,20 +20,36 @@ class _ShrinkifyConfig(NestedNamespace):
     '''big namespace for config options'''
     #global entries
     def __init__(self):
+        #cache path
         self.cache = pathlib.Path(pathlib.Path.home(), '.cache/shrinkify')
+        #directory that holds configuratian
         self.config_dir = pathlib.Path(pathlib.Path.home(), '.config/shrinkify')
+        #simulate conversion
         self.flag_simulate = False
+        #folder that is parsed and converted
         self.source_folder = pathlib.Path(pathlib.Path.home(), 'Music')
+        #folder to output converted files
         self.output_folder = pathlib.Path(pathlib.Path.home(), 'Music/compressed')
+        #debug mode (kinda useless)
         self.flag_debug = False
-        self.verbosity = 0 #0-5
+        #verbosity on a scale of 0 to 5
+        self.verbosity = 0
+        #folders to exclude from conversion
         self.exclude = ('compressed',)
+        #list of filetypes to convert
         self.filetypes = ('.mp3', '.mp4', '.mkv', '.webm', '.m4a', '.aac', '.wav', '.ogg', '.opus', '.flac')
+        #subconfigs
         self.ShrinkifyRuntime = self._ShrinkifyRuntime()
         self.MetadataRuntime = self._MetadataRuntime()
         self.PlaylistRuntime = self._PlaylistRuntime()
     
     def load_dict(self, d: dict, namespace=None):
+        """Load dictionary as config
+
+        Args:
+            d (dict): dictionary to load
+            namespace (object, optional): namespace to load config into. Defaults to None.
+        """
         if namespace is None:
             namespace = self
         for key, item in d.items():
@@ -48,6 +67,11 @@ class _ShrinkifyConfig(NestedNamespace):
                 setattr(namespace, key, item)
     
     def load_yaml(self, filename=pathlib.Path(pathlib.Path.home(), '.config/shrinkify/config.yaml')):
+        """Load yaml config file
+
+        Args:
+            filename (os.PathLike, optional): File to load. Defaults to pathlib.Path(pathlib.Path.home(), '.config/shrinkify/config.yaml').
+        """
         filename = pathlib.Path(filename)
         if filename.exists():
             logging.info("Config file exists, attempting to load")
