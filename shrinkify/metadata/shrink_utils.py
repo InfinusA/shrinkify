@@ -65,6 +65,23 @@ def smart_crop(img, threshold=5):
     
     # y_nonzero, x_nonzero, _ = np.nonzero(img_array>5)
     # img_array = img_array[np.min(y_nonzero):np.max(y_nonzero), np.min(x_nonzero):np.max(x_nonzero)]
+    
+    #if the image can be cropped to a square and the only color cropped is a single color, (eg logos in 16:9), don't crop all the color
+    #TODO: detect large borders (see "4v0kjleYTKY")
+    tall = img_array.shape[1] < img_array.shape[0]
+    if tall: # lazy fix (just rotate)
+        img_array = np.rot90(img_array)
+    mask = np.ones(img_array.shape, dtype=bool)
+    mask[:,img_array.shape[1]//2-img_array.shape[0]//2:img_array.shape[1]//2+img_array.shape[0]//2] = False
+    dev = np.nanstd(img_array, axis=1, where=mask)
+    dev = np.nan_to_num(dev)
+    ok = np.all(dev.max() < 0.2)
+    if ok or True:
+        new_img = Image.fromarray(img_array[:,img_array.shape[1]//2-img_array.shape[0]//2:img_array.shape[1]//2+img_array.shape[0]//2])
+        if tall:
+            new_img = np.rot90(new_img, 3)
+        new_img.show()
+        return new_img
 
     for _ in range(2):
         #rotate 90 degrees and do the horizontal ones first, then rotate back and do vertical

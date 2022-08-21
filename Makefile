@@ -8,3 +8,6 @@ install:
 #todo: dynamic version number
 clean:
 	rm -r build
+
+full: clean build install
+	echo "Clean, build, install complete"
