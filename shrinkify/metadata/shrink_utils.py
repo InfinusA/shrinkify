@@ -76,11 +76,10 @@ def smart_crop(img, threshold=5):
     dev = np.nanstd(img_array, axis=1, where=mask)
     dev = np.nan_to_num(dev)
     ok = np.all(dev.max() < 0.2)
-    if ok or True:
+    if ok:
         new_img = Image.fromarray(img_array[:,img_array.shape[1]//2-img_array.shape[0]//2:img_array.shape[1]//2+img_array.shape[0]//2])
         if tall:
             new_img = np.rot90(new_img, 3)
-        new_img.show()
         return new_img
 
     for _ in range(2):
