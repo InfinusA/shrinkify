@@ -15,38 +15,21 @@ class YoutubeMusicMetadata(object):
     Note that this does not do fuzzy text matching, but finds the exact corresponding metadata'''
     def __init__(self):
         self.ytm = self.CacheYTMusic(shrinkify_cache=ShrinkifyConfig.cache, override=ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_enabled)
-    def fetch(self, source_id, no_meta=False, no_thumb=False, no_cache=False):
-        """
-        source_id: a youtube video id
-        no_meta: don't get metadata, only the thumbnail
-        no_thumb: don't get thumbnail, only metadata
-          note: no_meta and no_thumb should generally not both be true
-        no_cache: temporarily disable cache. Useful to update the cache for a specific file
-        """
         
-        #load override
-        original_id = source_id
-        try:
-            if [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_song if source_id  == o[0]]:
-                original_id = source_id
-                source_id = [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_song if source_id in o][0][1]
-        except KeyError:
+    def search_match_fetch(self, song_info, source_id, original_id):
+        query = ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.search_query.format(title=song_info['videoDetails']['title'], artist=song_info['videoDetails']['author'])
+        search_results = self.ytm.search(query, filter="songs")
+        for result in search_results:
+            if result['videoId'] in (source_id, original_id):
+                selected_song = result
+                break
+        else:
             return False
-        # if ShrinkifyConfig.cache and ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_enabled:
-        #     override_file = pathlib.Path(ShrinkifyConfig.cache, 'ytmusic_overrides.json')
-        #     with override_file.open('r') as of:
-        #         override = json.loads(of.read())
-        #         if source_id in override['song']:
-        #             source_id = override['song'][source_id]
         
-        self.ytm.set_cache_state(not no_cache)
+        return selected_song, self.ytm.get_album(selected_song['album']['id'])
         
-        if no_meta == True and no_thumb == True:
-            raise RuntimeWarning("Should not set both meta_only and thumb_only to True. This just returns nothing and is a waste of time and resources")
-        '''Given a song id, return either metadata or false if the id is invalid'''
-        song_info = self.ytm.get_song(source_id)
-        if song_info['playabilityStatus']['status'] in ('UNPLAYABLE', 'ERROR'):
-            return False
+    
+    def artist_match_fetch(self, song_info, source_id, original_id):
         
         try:
             if [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_artist if song_info['videoDetails']['channelId']  == o[0]]:
@@ -129,10 +112,59 @@ class YoutubeMusicMetadata(object):
             logging.info(f"{source_id}: No song found")
             return False
         
+        return target_song, target_album
+    
+    def fetch(self, source_id, no_meta=False, no_thumb=False, no_cache=False):
+        """
+        source_id: a youtube video id
+        no_meta: don't get metadata, only the thumbnail
+        no_thumb: don't get thumbnail, only metadata
+          note: no_meta and no_thumb should generally not both be true
+        no_cache: temporarily disable cache. Useful to update the cache for a specific file
+        """
+        
+        #load override
+        original_id = source_id
+        try:
+            if [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_song if source_id  == o[0]]:
+                original_id = source_id
+                source_id = [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_song if source_id in o][0][1]
+        except KeyError:
+            return False
+        # if ShrinkifyConfig.cache and ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_enabled:
+        #     override_file = pathlib.Path(ShrinkifyConfig.cache, 'ytmusic_overrides.json')
+        #     with override_file.open('r') as of:
+        #         override = json.loads(of.read())
+        #         if source_id in override['song']:
+        #             source_id = override['song'][source_id]
+        
+        self.ytm.set_cache_state(not no_cache)
+        
+        if no_meta == True and no_thumb == True:
+            raise RuntimeWarning("Should not set both meta_only and thumb_only to True. This just returns nothing and is a waste of time and resources")
+        '''Given a song id, return either metadata or false if the id is invalid'''
+        song_info = self.ytm.get_song(source_id)
+        if song_info['playabilityStatus']['status'] in ('UNPLAYABLE', 'ERROR'):
+            return False
+        
+        method = ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.method
+        if method == 0:
+            raw_metadata = self.artist_match_fetch(song_info, source_id, original_id)
+        elif method == 1:
+            raw_metadata = self.search_match_fetch(song_info, source_id, original_id)
+        else:
+            raise RuntimeError(f"Unknown YTMusic metadata method: {ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.method}")
+        
+        if not raw_metadata:
+            return False
+        
+        target_song, target_album = raw_metadata
+        
         shrinkify_metadata = {}
         if not no_meta:
            shrinkify_metadata['title'] = target_song['title']
-           shrinkify_metadata['artist'] = artist_info['name']
+           #TODO: handle multiple artists
+           shrinkify_metadata['artist'] = target_album['artists'][0]['name']
            shrinkify_metadata['album'] = target_album['title'] if target_album is not None else None
            shrinkify_metadata['year'] = target_album['year']
            shrinkify_metadata['date'] = target_album['year']

@@ -110,6 +110,8 @@ class _ShrinkifyConfig(NestedNamespace):
                 self.api_key = ''
         class _YoutubeMusicMetadata(NestedNamespace):
             def __init__(self):
+                self.method = 1
+                self.search_query = "{title} - {artist}"
                 self.enabled = True
                 self.name_match = True
                 self.override_enabled = True

@@ -8,7 +8,7 @@ from . import playlist
 import pprint
 #TODO: global parser options (source/output directories always needed)
 def shrink_parser(parser: argparse.ArgumentParser):
-    parser.add_argument('--cache',          dest='cache', type=lambda p: pathlib.Path(p).expanduser().resolve(), default=str(ShrinkifyConfig.cache))
+    parser.add_argument('--cache',          dest='cache', type=lambda p: pathlib.Path(p).expanduser(), default=str(ShrinkifyConfig.cache))
     parser.add_argument('--simulate',       dest='flag_simulate', action="store_true")
     parser.add_argument('-f', '--overwrite-existing', '--force', dest='ShrinkifyRuntime.flag_overwrite', action='store_true', help="Overwrite existing files")
     parser.add_argument('--update-metadata',dest='ShrinkifyRuntime.flag_update_metadata', action='store_true', help='Update metadata without reconverting')
@@ -18,10 +18,10 @@ def shrink_parser(parser: argparse.ArgumentParser):
     parser.add_argument('--exclude',        dest='exclude_dir', nargs='+', help='list of directories to exclude', default=ShrinkifyConfig.exclude)
     parser.add_argument('--filetypes',      dest='filetypes', nargs='+', help='list of filetypes to convert', default=ShrinkifyConfig.filetypes)
     parser.add_argument('-t', '--throttle', dest='ShrinkifyRuntime.throttle_length', type=lambda x: int(x) if x.isdecimal() and (int(x) >= 0) else parser.error("Minimum throttle time is 0"), default=0)
-    parser.add_argument('--continue-from',  dest='ShrinkifyRuntime.continue_from', help="Continue from the file with this filename", type=lambda p: pathlib.Path(p).expanduser().resolve())
-    parser.add_argument('--single-file',    dest='ShrinkifyRuntime.single_file', type=lambda p: pathlib.Path(p).expanduser().resolve(), help="Only convert a single file.")
-    parser.add_argument('-s', '--source-folder', dest='source_folder', type=lambda p: pathlib.Path(p).expanduser().resolve(), default=ShrinkifyConfig.source_folder)
-    parser.add_argument('-o', '--output-folder', dest='output_folder', type=lambda p: pathlib.Path(p).expanduser().resolve(), default=ShrinkifyConfig.output_folder)
+    parser.add_argument('--continue-from',  dest='ShrinkifyRuntime.continue_from', help="Continue from the file with this filename", type=lambda p: pathlib.Path(p).expanduser())
+    parser.add_argument('--single-file',    dest='ShrinkifyRuntime.single_file', type=lambda p: pathlib.Path(p).expanduser(), help="Only convert a single file.")
+    parser.add_argument('-s', '--source-folder', dest='source_folder', type=lambda p: pathlib.Path(p).expanduser(), default=ShrinkifyConfig.source_folder)
+    parser.add_argument('-o', '--output-folder', dest='output_folder', type=lambda p: pathlib.Path(p).expanduser(), default=ShrinkifyConfig.output_folder)
     
     metadata_args = parser.add_argument_group('Metadata')
     metadata_args.add_argument('--youtube-api-key', dest='MetadataRuntime.YoutubeMetadata.api_key')
@@ -30,7 +30,7 @@ def shrink_parser(parser: argparse.ArgumentParser):
 
 def playlist_parser(parser: argparse.ArgumentParser):
     parser.add_argument('-v', '--verbose',  dest='verbosity', action='count', default=0)
-    parser.add_argument('-s', '--source-folder', dest='source_folder', type=lambda p: pathlib.Path(p).expanduser().resolve(), default=ShrinkifyConfig.source_folder)
+    parser.add_argument('-s', '--source-folder', dest='source_folder', type=lambda p: pathlib.Path(p).expanduser(), default=ShrinkifyConfig.source_folder)
     parser.add_argument('--skeleton-dir', type=pathlib.Path, help="location of json playlist files. Leave unchanged if unsure", default=ShrinkifyConfig.PlaylistRuntime.playlist_skeletion_dir)
     parser.add_argument('--current', '-c', dest='PlaylistRuntime.current', action="store_true", help="use current song based on mpris (linux-only, overrides specified songs)", default=ShrinkifyConfig.PlaylistRuntime.current)
     parser.add_argument('PlaylistRuntime.mode', choices=['add', 'a', 'remove', 'r', 'exclude', 'e', 'unexclude', 'u', 'list', 'l', 'new', 'n'], metavar="mode")
