@@ -33,15 +33,15 @@ class _ShrinkifyConfig(NestedNamespace):
         #debug mode (kinda useless)
         self.flag_debug = False
         #verbosity on a scale of 0 to 5
-        self.verbosity = 0
+        self.verbosity = logging.WARNING//10
         #folders to exclude from conversion
         self.exclude = ('compressed',)
         #list of filetypes to convert
         self.filetypes = ('.mp3', '.mp4', '.mkv', '.webm', '.m4a', '.aac', '.wav', '.ogg', '.opus', '.flac')
         #subconfigs
-        self.ShrinkifyRuntime = self._ShrinkifyRuntime()
-        self.MetadataRuntime = self._MetadataRuntime()
-        self.PlaylistRuntime = self._PlaylistRuntime()
+        self.Shrinkify = self._Shrinkify()
+        self.Metadata = self._Metadata()
+        self.Playlist = self._Playlist()
     
     def load_dict(self, d: dict, namespace=None):
         """Load dictionary as config
@@ -56,7 +56,10 @@ class _ShrinkifyConfig(NestedNamespace):
             logging.debug(f"Loading config entry {key}")
             if isinstance(item, dict):
                 logging.debug(f"Item {key} is dict, recursing")
-                self.load_dict(item, namespace=getattr(namespace, key))
+                try:
+                    self.load_dict(item, namespace=getattr(namespace, key))
+                except AttributeError as e:
+                    logging.warning(f"Error when loading config - {type(e).__name__}: {e}")
             elif isinstance(item, str):
                 #test for path, and convert to path automatically
                 if isinstance(getattr(namespace, key), pathlib.Path):
@@ -80,7 +83,7 @@ class _ShrinkifyConfig(NestedNamespace):
         else:
             logging.info("Config file doesn't exist")
     
-    class _ShrinkifyRuntime(NestedNamespace):
+    class _Shrinkify(NestedNamespace):
         def __init__(self):
             self.continue_from = None
             self.single_file = None
@@ -89,7 +92,7 @@ class _ShrinkifyConfig(NestedNamespace):
             self.flag_update_metadata = False
             self.flag_overwrite = False
     
-    class _MetadataRuntime(NestedNamespace):
+    class _Metadata(NestedNamespace):
         def __init__(self):
             # self.enabled_parsers = ['youtube', 'youtube music', 'file']
             self.youtube_comments = False
@@ -118,7 +121,7 @@ class _ShrinkifyConfig(NestedNamespace):
                 self.override_artist = []
                 self.override_song = []
     
-    class _PlaylistRuntime(NestedNamespace):
+    class _Playlist(NestedNamespace):
         def __init__(self):
             self.mode = None
             self.selected_playlist = None

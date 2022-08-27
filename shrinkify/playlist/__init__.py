@@ -25,15 +25,15 @@ class PlaylistModifier(object):
         pass
     
     def list(self, selected_playlist=None):
-        selected_playlist = selected_playlist if selected_playlist else ShrinkifyConfig.PlaylistRuntime.selected_playlist
+        selected_playlist = selected_playlist if selected_playlist else ShrinkifyConfig.Playlist.selected_playlist
         if not selected_playlist:
-            for playlist_skeletion in pathlib.Path(ShrinkifyConfig.PlaylistRuntime.playlist_skeletion_dir).iterdir():
+            for playlist_skeletion in pathlib.Path(ShrinkifyConfig.Playlist.playlist_skeletion_dir).iterdir():
                 if playlist_skeletion.suffix != '.json':
                     continue
                 print(f"{str(playlist_skeletion)} - {json.loads(playlist_skeletion.read_text())['title']}")
         else:
             playlist_gen = PlaylistGenerator()
-            playlist_file = pathlib.Path(ShrinkifyConfig.PlaylistRuntime.playlist_skeletion_dir, f'{selected_playlist}.json')
+            playlist_file = pathlib.Path(ShrinkifyConfig.Playlist.playlist_skeletion_dir, f'{selected_playlist}.json')
             playlist_data = json.loads(playlist_file.read_text())
             for index, line in enumerate(playlist_data['include']):
                 if isinstance(line, str):
@@ -50,11 +50,11 @@ class PlaylistModifier(object):
         file.write_text(json.dumps(current_playlist))
     
     def modify(self, mode=None, selected_playlist=None, selected_songs=None):
-        mode = mode if mode else ShrinkifyConfig.PlaylistRuntime.mode
-        selected_playlist = selected_playlist if selected_playlist else ShrinkifyConfig.PlaylistRuntime.selected_playlist
-        selected_songs = selected_songs if selected_songs else ShrinkifyConfig.PlaylistRuntime.selected_songs
+        mode = mode if mode else ShrinkifyConfig.Playlist.mode
+        selected_playlist = selected_playlist if selected_playlist else ShrinkifyConfig.Playlist.selected_playlist
+        selected_songs = selected_songs if selected_songs else ShrinkifyConfig.Playlist.selected_songs
         
-        if ShrinkifyConfig.PlaylistRuntime.current:
+        if ShrinkifyConfig.Playlist.current:
             bus = dbus.SessionBus()
             #select first player
             for service in bus.list_names():
@@ -74,7 +74,7 @@ class PlaylistModifier(object):
             raise RuntimeError("No action supplied.")
         
         #TODO: fallback on title inside file if nothing matches
-        playlist_file = pathlib.Path(ShrinkifyConfig.PlaylistRuntime.playlist_skeletion_dir, f'{selected_playlist}.json')
+        playlist_file = pathlib.Path(ShrinkifyConfig.Playlist.playlist_skeletion_dir, f'{selected_playlist}.json')
         playlist_data = json.loads(playlist_file.read_text())
         if mode in ('a', 'add'):
             playlist_data['include'].extend(selected_songs)
@@ -92,15 +92,15 @@ class PlaylistModifier(object):
 class PlaylistGenerator(object):
     def __init__(self) -> None:
         self.playlist_root = pathlib.Path(ShrinkifyConfig.output_folder).resolve()
-        self.exclude = ShrinkifyConfig.PlaylistRuntime.exclude
+        self.exclude = ShrinkifyConfig.Playlist.exclude
         self.filetypes = ShrinkifyConfig.filetypes
         self.metadata = FileMetadata()
     
     def create_playlists(self) -> None:
         #get playlist jsons
         #dunno why config is in yaml but playlist in json but eh whatever
-        logging.debug(f"Playlist mode is {'quoted' if ShrinkifyConfig.PlaylistRuntime.escape_codes else 'unquoted'}")
-        playlist_list = ShrinkifyConfig.PlaylistRuntime.playlist_skeletion_dir.glob("*.json")
+        logging.debug(f"Playlist mode is {'quoted' if ShrinkifyConfig.Playlist.escape_codes else 'unquoted'}")
+        playlist_list = ShrinkifyConfig.Playlist.playlist_skeletion_dir.glob("*.json")
         playlist_data = {}
         for playlist in playlist_list:
             logging.debug(f"Parsing json for playlist: {playlist.name}")
@@ -144,7 +144,7 @@ class PlaylistGenerator(object):
             with output_file.open('w+') as op:
                 for song in playlist_items:
                     relative_song = song.relative_to(self.playlist_root)
-                    output_string = f"{quote(str(relative_song)).replace('%2F', '/')}\n" if ShrinkifyConfig.PlaylistRuntime.escape_codes \
+                    output_string = f"{quote(str(relative_song)).replace('%2F', '/')}\n" if ShrinkifyConfig.Playlist.escape_codes \
                         else f"{relative_song}\n"# else f"{str(relative_song).replace('#', '%23')}\n"
                         
                     op.write(output_string)
@@ -153,7 +153,7 @@ class PlaylistGenerator(object):
             # with output_file.open('w+') as op:
             #     for song in self.playlist_generic(playlist_data['exclude'], playlist_data['include']):
             #         relative_song = song.relative_to(self.playlist_root)
-            #         output_string = f"{quote(str(relative_song)).replace('%2F', '/')}\n" if ShrinkifyConfig.PlaylistRuntime.escape_codes \
+            #         output_string = f"{quote(str(relative_song)).replace('%2F', '/')}\n" if ShrinkifyConfig.Playlist.escape_codes \
             #             else f"{relative_song}\n"# else f"{str(relative_song).replace('#', '%23')}\n"
                         
             #         op.write(output_string)

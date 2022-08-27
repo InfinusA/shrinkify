@@ -14,10 +14,10 @@ class YoutubeMusicMetadata(object):
     '''Find metadata for a youtube music video on youtube music. 
     Note that this does not do fuzzy text matching, but finds the exact corresponding metadata'''
     def __init__(self):
-        self.ytm = self.CacheYTMusic(shrinkify_cache=ShrinkifyConfig.cache, override=ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_enabled)
+        self.ytm = self.CacheYTMusic(shrinkify_cache=ShrinkifyConfig.cache, override=ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_enabled)
         
     def search_match_fetch(self, song_info, source_id, original_id):
-        query = ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.search_query.format(title=song_info['videoDetails']['title'], artist=song_info['videoDetails']['author'])
+        query = ShrinkifyConfig.Metadata.YoutubeMusicMetadata.search_query.format(title=song_info['videoDetails']['title'], artist=song_info['videoDetails']['author'])
         search_results = self.ytm.search(query, filter="songs")
         for result in search_results:
             if result['videoId'] in (source_id, original_id):
@@ -32,8 +32,8 @@ class YoutubeMusicMetadata(object):
     def artist_match_fetch(self, song_info, source_id, original_id):
         
         try:
-            if [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_artist if song_info['videoDetails']['channelId']  == o[0]]:
-                artist_id = [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_artist if song_info['videoDetails']['channelId'] in o][0][1]
+            if [o for o in ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_artist if song_info['videoDetails']['channelId']  == o[0]]:
+                artist_id = [o for o in ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_artist if song_info['videoDetails']['channelId'] in o][0][1]
             else:
                 artist_id = song_info['videoDetails']['channelId']
         except KeyError:
@@ -59,7 +59,7 @@ class YoutubeMusicMetadata(object):
             for album in albums:
                 album_songs = self.ytm.get_album(album['browseId'])
                 for song in album_songs['tracks']:
-                    if song['videoId'] in (source_id, original_id) or (ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.name_match and song_info['videoDetails']['title'] == song['title']): #some songs are strange and the url links to the original, not the yt music ver
+                    if song['videoId'] in (source_id, original_id) or (ShrinkifyConfig.Metadata.YoutubeMusicMetadata.name_match and song_info['videoDetails']['title'] == song['title']): #some songs are strange and the url links to the original, not the yt music ver
                         logging.info(f"{source_id}: Found song in album")
                         songfound = True
                         target_song = song
@@ -69,7 +69,7 @@ class YoutubeMusicMetadata(object):
                 if songfound:
                     break
                 
-                if ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.name_match:
+                if ShrinkifyConfig.Metadata.YoutubeMusicMetadata.name_match:
                     for song in album_songs['tracks']:
                         if song_info['videoDetails']['title'] == song['title']: #some songs are strange and the url links to the original, not the yt music ver
                             logging.info(f"{source_id}: Found song in album")
@@ -98,7 +98,7 @@ class YoutubeMusicMetadata(object):
                 if songfound:
                     break
                 
-                if ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.name_match:
+                if ShrinkifyConfig.Metadata.YoutubeMusicMetadata.name_match:
                     for track in song_data['tracks']:
                         if song_info['videoDetails']['title'] == track['title']:
                             songfound = True
@@ -126,12 +126,12 @@ class YoutubeMusicMetadata(object):
         #load override
         original_id = source_id
         try:
-            if [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_song if source_id  == o[0]]:
+            if [o for o in ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_song if source_id  == o[0]]:
                 original_id = source_id
-                source_id = [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_song if source_id in o][0][1]
+                source_id = [o for o in ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_song if source_id in o][0][1]
         except KeyError:
             return False
-        # if ShrinkifyConfig.cache and ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_enabled:
+        # if ShrinkifyConfig.cache and ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_enabled:
         #     override_file = pathlib.Path(ShrinkifyConfig.cache, 'ytmusic_overrides.json')
         #     with override_file.open('r') as of:
         #         override = json.loads(of.read())
@@ -144,16 +144,16 @@ class YoutubeMusicMetadata(object):
             raise RuntimeWarning("Should not set both meta_only and thumb_only to True. This just returns nothing and is a waste of time and resources")
         '''Given a song id, return either metadata or false if the id is invalid'''
         song_info = self.ytm.get_song(source_id)
-        if song_info['playabilityStatus']['status'] in ('UNPLAYABLE', 'ERROR'):
+        if song_info['playabilityStatus']['status'] in ('UNPLAYABLE', 'ERROR', 'LOGIN_REQUIRED'):
             return False
         
-        method = ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.method
+        method = ShrinkifyConfig.Metadata.YoutubeMusicMetadata.method
         if method == 0:
             raw_metadata = self.artist_match_fetch(song_info, source_id, original_id)
         elif method == 1:
-            raw_metadata = self.search_match_fetch(song_info, source_id, original_id)
+            raw_metadata = self.search_match_fetch(song_info, source_id, original_id) or self.artist_match_fetch(song_info, source_id, original_id)
         else:
-            raise RuntimeError(f"Unknown YTMusic metadata method: {ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.method}")
+            raise RuntimeError(f"Unknown YTMusic metadata method: {ShrinkifyConfig.Metadata.YoutubeMusicMetadata.method}")
         
         if not raw_metadata:
             return False
@@ -195,7 +195,7 @@ class YoutubeMusicMetadata(object):
             # self.override = override
             self.cache_state = True if self.shrinkify_cache else False
             # self.overrides = json.loads(self.override_file.read_text()) if self.shrinkify_cache is not None and self.override_file.is_file() else {}
-            self.overrides = ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_song
+            self.overrides = ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_song
             super().__init__(*args, **kwargs)
         
         def set_cache_state(self, state: bool):
@@ -210,12 +210,12 @@ class YoutubeMusicMetadata(object):
         def get_override(self, key, val):
             if key == "song":
                 try:
-                    return [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_song if val == o[0]][0][1]
+                    return [o for o in ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_song if val == o[0]][0][1]
                 except IndexError:
                     return False
             elif key == "artist":
                 try:
-                    return [o for o in ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_artist if val == o[0]][0][1]
+                    return [o for o in ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_artist if val == o[0]][0][1]
                 except IndexError:
                     return False
             else:

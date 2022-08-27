@@ -49,13 +49,13 @@ class Shrinkify(object):
         # pprint.pprint(metadata)
         
         # # if ShrinkifyConfig.flag_simulate:
-        # #     time.sleep(ShrinkifyConfig.ShrinkifyRuntime.throttle_length)
+        # #     time.sleep(ShrinkifyConfig.Shrinkify.throttle_length)
         # #     return
         # output_file.parent.mkdir(exist_ok=True, parents=True)
         # metadata_list = [f"{k}={v}" for k, v in metadata.items() if not k.startswith("_")]
         # if ShrinkifyConfig.flag_simulate:
         #     return
-        # if ShrinkifyConfig.ShrinkifyRuntime.flag_update_metadata and output_file.is_file():
+        # if ShrinkifyConfig.Shrinkify.flag_update_metadata and output_file.is_file():
         #     #create temp file since ffmpeg can't overwrite in-place
         #     tmp_file = pathlib.Path(root, f'tmp_file{output_file.suffix}')
         #     tmp_file.unlink(missing_ok=True)
@@ -81,7 +81,7 @@ class Shrinkify(object):
         # if ShrinkifyConfig.flag_debug:
         #     print("Waiting for ffmpeg to finish")
         # ffmpeg.communicate()
-        # if ShrinkifyConfig.ShrinkifyRuntime.flag_update_metadata:
+        # if ShrinkifyConfig.Shrinkify.flag_update_metadata:
         #     tmp_file.unlink(missing_ok=False)
             
             
@@ -93,14 +93,14 @@ class Shrinkify(object):
             flist = root.rglob("*")
         for file in flist:
             output_file = pathlib.Path(output_folder, file.relative_to(root).with_suffix('.m4a'))
-            if ShrinkifyConfig.ShrinkifyRuntime.continue_from is not None and not continue_flag: #we are doing a continue and it hasn't been disabled
-                if file.name == ShrinkifyConfig.ShrinkifyRuntime.continue_from or str(file) == ShrinkifyConfig.ShrinkifyRuntime.continue_from:
+            if ShrinkifyConfig.Shrinkify.continue_from is not None and not continue_flag: #we are doing a continue and it hasn't been disabled
+                if file.resolve() == pathlib.Path(ShrinkifyConfig.Shrinkify.continue_from).expanduser().resolve():
                     continue_flag = True
                 else:
                     continue
             if file.is_dir():
                 continue
-            if not ShrinkifyConfig.ShrinkifyRuntime.flag_overwrite and output_file.is_file() and not ShrinkifyConfig.ShrinkifyRuntime.single_file:
+            if not ShrinkifyConfig.Shrinkify.flag_overwrite and output_file.is_file() and not ShrinkifyConfig.Shrinkify.single_file:
                 # print('file exists, skipping')
                 continue
             if file.suffix not in ShrinkifyConfig.filetypes:
@@ -132,17 +132,18 @@ class Shrinkify(object):
             metadata_list = [f"{k}={v}" for k, v in metadata.items() if not k.startswith("_")]
             
             if ShrinkifyConfig.flag_simulate:
-                time.sleep(ShrinkifyConfig.ShrinkifyRuntime.throttle_length)
+                time.sleep(ShrinkifyConfig.Shrinkify.throttle_length)
                 continue
             
             #create temp file since ffmpeg can't overwrite in-place (and it's safer in most cases)
             #TODO: make me toggleable
             tmp_file = pathlib.Path(output_file.parent, f"shrinkify-tmp{output_file.suffix}")
 
-            ffmpeg_input = output_file if ShrinkifyConfig.ShrinkifyRuntime.flag_update_metadata and output_file.exists() else file
+            ffmpeg_input = output_file if ShrinkifyConfig.Shrinkify.flag_update_metadata and output_file.exists() else file
             ffmpeg_args = ['ffmpeg', '-hide_banner', '-y', 
                 '-i', str(ffmpeg_input.resolve()), '-i', '-', 
-                '-map', '0:a:0', '-map', '1', '-c:v', 'copy', '-disposition:v:0', 'attached_pic', '-c:a', 'aac']
+                '-map', '0:a:0', '-map', '1', '-c:v', 'copy', '-disposition:v:0', 'attached_pic', '-c:a']
+            ffmpeg_args.append("copy" if ShrinkifyConfig.Shrinkify.flag_update_metadata and output_file.exists() else "aac")
                 
             for metadata_val in metadata_list:
                 ffmpeg_args.append('-metadata')
@@ -167,7 +168,7 @@ class Shrinkify(object):
                 output_file.rename("_"+str(output_file.resolve))
                 tmp_file.rename(output_file.resolve())
                 pathlib.Path("_"+str(output_file.resolve())).unlink(missing_ok=True)
-            time.sleep(ShrinkifyConfig.ShrinkifyRuntime.throttle_length)
+            time.sleep(ShrinkifyConfig.Shrinkify.throttle_length)
         
     def recursive_delete(self):
         #recursively delete any files not in the parent directory

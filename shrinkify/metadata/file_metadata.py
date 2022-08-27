@@ -34,9 +34,9 @@ class FileMetadata(object):
                 if cover_art.exists():
                     thumbnail = shrink_utils.data_to_thumbnail(cover_art.read_bytes())
                 else:
-                    if ShrinkifyConfig.MetadataRuntime.ThumbnailGenerator.enabled:
+                    if ShrinkifyConfig.Metadata.ThumbnailGenerator.enabled:
                         title = shrinkify_metadata['title'] if 'title' in shrinkify_metadata else file.stem
-                        thumbnail = shrink_utils.custom_thumbnail_generator(title, font=ShrinkifyConfig.MetadataRuntime.ThumbnailGenerator.font, font_size=ShrinkifyConfig.MetadataRuntime.ThumbnailGenerator.font_size, base_image=ShrinkifyConfig.MetadataRuntime.ThumbnailGenerator.base_image)
+                        thumbnail = shrink_utils.custom_thumbnail_generator(title, font=ShrinkifyConfig.Metadata.ThumbnailGenerator.font, font_size=ShrinkifyConfig.Metadata.ThumbnailGenerator.font_size, base_image=ShrinkifyConfig.Metadata.ThumbnailGenerator.base_image)
                     else:
                         thumbnail = None
             shrinkify_metadata['_thumbnail_image'] = thumbnail

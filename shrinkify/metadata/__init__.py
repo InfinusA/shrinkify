@@ -17,10 +17,10 @@ class MetadataProcessor(object):
         # default_parser_args = {'ytm': {}, 'yt': {'youtube_api_key': None}, 'file': {'thumbnail_generator_args': {'font': '3ds Light', 'base_image': '/media/ext1/music/not-music/no-image.png'}}}
         # default_parser_args.update(parser_arguments)
         # self.enabled_parsers = enabled_parsers
-        self.ytm_parser = youtube_music_metadata.YoutubeMusicMetadata() if ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.enabled else AutoFail()
-        self.yt_parser = youtube_metadata.YoutubeMetadata() if ShrinkifyConfig.MetadataRuntime.YoutubeMetadata.enabled else AutoFail()
+        self.ytm_parser = youtube_music_metadata.YoutubeMusicMetadata() if ShrinkifyConfig.Metadata.YoutubeMusicMetadata.enabled else AutoFail()
+        self.yt_parser = youtube_metadata.YoutubeMetadata() if ShrinkifyConfig.Metadata.YoutubeMetadata.enabled else AutoFail()
         self.fm_parser = file_metadata.FileMetadata()
-        self.ytm_comments = ShrinkifyConfig.MetadataRuntime.YoutubeMetadata.enabled and ShrinkifyConfig.MetadataRuntime.youtube_comments
+        self.ytm_comments = ShrinkifyConfig.Metadata.YoutubeMetadata.enabled and ShrinkifyConfig.Metadata.youtube_comments
         
         #create cache directory if one is specified
         if isinstance(ShrinkifyConfig.cache, pathlib.Path):

@@ -10,7 +10,7 @@ class MetadataTester(unittest.TestCase):
         super().__init__(*args, **kwargs)
         self.ytm = metadata.youtube_music_metadata.YoutubeMusicMetadata()
         self.yt = metadata.youtube_metadata.YoutubeMetadata()
-        ShrinkifyConfig.MetadataRuntime.YoutubeMetadata.api_key = os.getenv("YT_API_KEY")
+        ShrinkifyConfig.Metadata.YoutubeMetadata.api_key = os.getenv("YT_API_KEY")
         self.fm = metadata.file_metadata.FileMetadata()
         
     def test_ytm_valid(self):
@@ -41,7 +41,7 @@ class MetadataTester(unittest.TestCase):
         self.assertTrue(cv)
         
     def test_ytm_override(self):
-        ShrinkifyConfig.MetadataRuntime.YoutubeMusicMetadata.override_artist = [["UCaXRnD344VW4pw9-cqmBEzw", "UC0nHqGCP46JhIUw867xXJ-Q"]]
+        ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_artist = [["UCaXRnD344VW4pw9-cqmBEzw", "UC0nHqGCP46JhIUw867xXJ-Q"]]
         cv = self.ytm.ytm.get_artist('UCaXRnD344VW4pw9-cqmBEzw')
         self.assertEqual('UC0nHqGCP46JhIUw867xXJ-Q', cv['channelId'])
         

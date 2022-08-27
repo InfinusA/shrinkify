@@ -18,7 +18,7 @@ def match_yt_id(filename):
 
 class YoutubeMetadata(object):
     def __init__(self) -> None:
-        self.ytc = self.YoutubeCache(ShrinkifyConfig.MetadataRuntime.YoutubeMetadata.api_key, ShrinkifyConfig.cache)
+        self.ytc = self.YoutubeCache(ShrinkifyConfig.Metadata.YoutubeMetadata.api_key, ShrinkifyConfig.cache)
 
     def fetch(self, video_id, no_meta=False, no_thumb=False, no_cache=False):
         self.ytc.set_cache_state(not no_cache)

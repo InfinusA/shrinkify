@@ -9,7 +9,7 @@ def main():
     pprint.pprint(get_songs())
     
 def get_songs():
-    return [*complex_matches, *json.loads(pathlib.Path(ShrinkifyConfig.PlaylistRuntime.playlist_skeletion_dir, 'arch.json').read_text())]
+    return [*complex_matches, *json.loads(pathlib.Path(ShrinkifyConfig.Playlist.playlist_skeletion_dir, 'arch.json').read_text())]
 
 complex_matches = [
     lambda title: ((not smart_regex.regex_is_yt()(title)) and '99' in title) or smart_regex.regex_no_yt('99')(title),

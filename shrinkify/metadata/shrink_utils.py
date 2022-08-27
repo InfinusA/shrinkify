@@ -120,7 +120,7 @@ def data_to_thumbnail(raw_data, *args, **kwargs):
     '''wrapper for thumbnail_generator that converts raw bytes into a Pillow image'''
     filewrapper = BytesIO(raw_data)
     real_image = Image.open(filewrapper, formats=None)
-    match ShrinkifyConfig.MetadataRuntime.ThumbnailGenerator.generator_mode:
+    match ShrinkifyConfig.Metadata.ThumbnailGenerator.generator_mode:
         case 0:
             return thumbnail_generator(real_image, *args, **kwargs)
         case 1:
