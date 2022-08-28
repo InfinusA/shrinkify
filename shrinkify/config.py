@@ -82,11 +82,11 @@ class _ShrinkifyConfig(NestedNamespace):
         """
         filename = pathlib.Path(filename)
         if filename.exists():
-            logging.info("Config file exists, attempting to load")
+            logging.debug("Config file exists, attempting to load")
             temp_conf = yaml.load(filename.read_text(), Loader=yaml.Loader)
             self.load_dict(temp_conf)
         else:
-            logging.info("Config file doesn't exist")
+            logging.debug("Config file doesn't exist")
     
     class _Shrinkify(NestedNamespace):
         def __init__(self):

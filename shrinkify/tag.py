@@ -116,7 +116,7 @@ class Tagify(object):
                     songtags = []
                 songtags.extend(file.relative_to(ShrinkifyConfig.output_folder).parts)
                 
-                if mode == enums.INCLUDE and set(songtags).issuperset(tags):
+                if mode == enums.INCLUDE and set(songtags).intersection(tags):
                     playlist.write(f"{self._format_song_string(str(file.relative_to(ShrinkifyConfig.output_folder)))}\n")
                 elif mode == enums.EXCLUDE and not set(songtags).intersection(tags):
                     playlist.write(f"{self._format_song_string(str(file.relative_to(ShrinkifyConfig.output_folder)))}\n")
