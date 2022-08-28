@@ -42,6 +42,8 @@ class _ShrinkifyConfig(NestedNamespace):
         self.Shrinkify = self._Shrinkify()
         self.Metadata = self._Metadata()
         self.Playlist = self._Playlist()
+        self.Tag = self._Tag()
+        self.Runtime = self._Runtime()
     
     def load_dict(self, d: dict, namespace=None):
         """Load dictionary as config
@@ -54,7 +56,10 @@ class _ShrinkifyConfig(NestedNamespace):
             namespace = self
         for key, item in d.items():
             logging.debug(f"Loading config entry {key}")
-            if isinstance(item, dict):
+            if namespace == self and isinstance(item, dict) and key == 'Runtime':
+                logging.warning("Runtime options cannot be set from the config file")
+                continue
+            elif isinstance(item, dict):
                 logging.debug(f"Item {key} is dict, recursing")
                 try:
                     self.load_dict(item, namespace=getattr(namespace, key))
@@ -131,6 +136,15 @@ class _ShrinkifyConfig(NestedNamespace):
             self.playlist_skeletion_dir = pathlib.Path(pathlib.Path.home(), '.config/shrinkify/')
             self.escape_codes = True
             self.current = False
+    
+    class _Tag(NestedNamespace):
+        def __init__(self):
+            pass
+        
+    class _Runtime(NestedNamespace):
+        '''THIS CLASS SHOULD NOT BE USED IN THE CONFIG FILE AND IS ONLY FOR RUNTIME OPTIONS'''
+        def __init__(self) -> None:
+            pass
         
 ShrinkifyConfig = _ShrinkifyConfig()
 #global instance

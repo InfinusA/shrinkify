@@ -68,17 +68,6 @@ class YoutubeMusicMetadata(object):
                 #2nd break
                 if songfound:
                     break
-                
-                if ShrinkifyConfig.Metadata.YoutubeMusicMetadata.name_match:
-                    for song in album_songs['tracks']:
-                        if song_info['videoDetails']['title'] == song['title']: #some songs are strange and the url links to the original, not the yt music ver
-                            logging.info(f"{source_id}: Found song in album")
-                            songfound = True
-                            target_song = song
-                            target_album = album
-                            break
-                    if songfound:
-                        break
         
         if not songfound and 'singles' in artist_info:
             logging.info(f"{source_id}: Searching singles")
@@ -97,8 +86,35 @@ class YoutubeMusicMetadata(object):
                         break
                 if songfound:
                     break
-                
-                if ShrinkifyConfig.Metadata.YoutubeMusicMetadata.name_match:
+        
+        if not songfound and ShrinkifyConfig.Metadata.YoutubeMusicMetadata.name_match:
+            if 'albums' in artist_info: #most valid artists should have albums
+                logging.info(f"{source_id}: Searching albums")
+                #long line but basically
+                #if params exists, it is a key used to get all the artist's albums, so use it to fetch the artist's albums
+                #if not, all are already available and we just use the available ones
+                albums = self.ytm.get_artist_albums(artist_id, self.ytm.get_params(artist_id)) \
+                    if 'params' in artist_info['albums'] else artist_info['albums']['results']
+                for album in albums:
+                    album_songs = self.ytm.get_album(album['browseId'])
+                    for song in album_songs['tracks']:
+                        if song_info['videoDetails']['title'] == song['title']: #some songs are strange and the url links to the original, not the yt music ver
+                            logging.info(f"{source_id}: Found song in album")
+                            songfound = True
+                            target_song = song
+                            target_album = album
+                            break
+                    if songfound:
+                        break
+            
+            if not songfound and 'singles' in artist_info:
+                logging.info(f"{source_id}: Searching singles")
+                if self.ytm.get_params(artist_id, True):
+                    songs = self.ytm.get_artist_albums(artist_id, self.ytm.get_params(artist_id, True))
+                else:
+                    songs = artist_info['singles']['results']
+                for song in songs:
+                    song_data = self.ytm.get_album(song['browseId'])
                     for track in song_data['tracks']:
                         if song_info['videoDetails']['title'] == track['title']:
                             songfound = True
@@ -162,12 +178,15 @@ class YoutubeMusicMetadata(object):
         
         shrinkify_metadata = {}
         if not no_meta:
-           shrinkify_metadata['title'] = target_song['title']
-           #TODO: handle multiple artists
-           shrinkify_metadata['artist'] = target_album['artists'][0]['name']
-           shrinkify_metadata['album'] = target_album['title'] if target_album is not None else None
-           shrinkify_metadata['year'] = target_album['year']
-           shrinkify_metadata['date'] = target_album['year']
+            shrinkify_metadata['title'] = target_song['title']
+            #TODO: handle multiple artists
+            try:
+                shrinkify_metadata['artist'] = target_album['artists'][0]['name']
+            except KeyError:
+                shrinkify_metadata['artist'] = target_song['artists'][0]['name']
+            shrinkify_metadata['album'] = target_album['title'] if target_album is not None else None
+            shrinkify_metadata['year'] = target_album['year']
+            shrinkify_metadata['date'] = target_album['year']
         if not no_thumb:
             if ShrinkifyConfig.cache:
                 cache_file = pathlib.Path(ShrinkifyConfig.cache, f'{source_id}.png')

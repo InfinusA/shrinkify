@@ -79,7 +79,7 @@ def smart_crop(img, threshold=5):
     if ok:
         new_img = Image.fromarray(img_array[:,img_array.shape[1]//2-img_array.shape[0]//2:img_array.shape[1]//2+img_array.shape[0]//2])
         if tall:
-            new_img = np.rot90(new_img, 3)
+            new_img = np.rot90(new_img, -1)
         return new_img
 
     for _ in range(2):

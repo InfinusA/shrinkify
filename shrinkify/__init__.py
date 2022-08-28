@@ -10,6 +10,7 @@ from io import BytesIO
 
 from . import metadata
 from . import playlist
+from . import utils
 from .config import ShrinkifyConfig
 
 
@@ -24,9 +25,6 @@ class Namespace(object):
 class Shrinkify(object):
     def __init__(self):
         self.meta_parser = metadata.MetadataProcessor()
-    
-    def is_invalid(self, file: pathlib.Path) -> bool:
-        return bool(set(ShrinkifyConfig.exclude).intersection(set(file.parts)))#True not in [s in str(file) for s in ShrinkifyConfig.exclude]
     
     def single_convert(self, filename):
         self.recursive_convert(flist=[filename], show_metadata=True)
@@ -90,34 +88,34 @@ class Shrinkify(object):
         output_folder = pathlib.Path(root, 'compressed').expanduser().resolve() if not isinstance(ShrinkifyConfig.output_folder, pathlib.Path) else ShrinkifyConfig.output_folder
         continue_flag = False
         if flist is None:
-            flist = root.rglob("*")
-        for file in flist:
+            flist = tuple(root.rglob("*"))
+        #TODO:filter out nonvalid beforehand
+        for file_index, file in enumerate(flist):
             output_file = pathlib.Path(output_folder, file.relative_to(root).with_suffix('.m4a'))
             if ShrinkifyConfig.Shrinkify.continue_from is not None and not continue_flag: #we are doing a continue and it hasn't been disabled
                 if file.resolve() == pathlib.Path(ShrinkifyConfig.Shrinkify.continue_from).expanduser().resolve():
                     continue_flag = True
                 else:
                     continue
-            if file.is_dir():
+            if not utils.is_valid(file):
                 continue
             if not ShrinkifyConfig.Shrinkify.flag_overwrite and output_file.is_file() and not ShrinkifyConfig.Shrinkify.single_file:
                 # print('file exists, skipping')
-                continue
-            if file.suffix not in ShrinkifyConfig.filetypes:
-                # print('filetype invalid, skipping')
-                continue
-            # if set(ShrinkifyConfig.exclude).intersection(set(file.parts)): #any parts of path in the parts of filename
-            if self.is_invalid(file):
-                # print('file is in invalid directory, skipping')
                 continue
             if 'test_cases' in file.parts and ShrinkifyConfig.flag_debug is False:
                 continue
                     
             #continue scripts
-            print(f"Converting {file.relative_to(root)}")
+            print(f"Converting #{file_index}/{len(flist)} {file.relative_to(root)}")
             # logging.debug(file)
             print("Fetching metadata")
-            metadata = self.meta_parser.parse(file)
+            while True:
+                try:
+                    metadata = self.meta_parser.parse(file)
+                    break
+                except Exception as e:
+                    logging.error(f"Error when fetching metadata: {type(e).__name__}: {e}")
+                    time.sleep(ShrinkifyConfig.Shrinkify.throttle_length)
             if show_metadata:
                 print("\nMetadata Info:")
                 for opt in metadata.items():
@@ -169,6 +167,7 @@ class Shrinkify(object):
                 tmp_file.rename(output_file.resolve())
                 pathlib.Path("_"+str(output_file.resolve())).unlink(missing_ok=True)
             time.sleep(ShrinkifyConfig.Shrinkify.throttle_length)
+            print()
         
     def recursive_delete(self):
         #recursively delete any files not in the parent directory

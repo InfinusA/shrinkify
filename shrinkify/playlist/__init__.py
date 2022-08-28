@@ -100,7 +100,7 @@ class PlaylistGenerator(object):
         #get playlist jsons
         #dunno why config is in yaml but playlist in json but eh whatever
         logging.debug(f"Playlist mode is {'quoted' if ShrinkifyConfig.Playlist.escape_codes else 'unquoted'}")
-        playlist_list = ShrinkifyConfig.Playlist.playlist_skeletion_dir.glob("*.json")
+        playlist_list = filter(lambda j: j.name != "tags.json", ShrinkifyConfig.Playlist.playlist_skeletion_dir.glob("*.json"))
         playlist_data = {}
         for playlist in playlist_list:
             logging.debug(f"Parsing json for playlist: {playlist.name}")

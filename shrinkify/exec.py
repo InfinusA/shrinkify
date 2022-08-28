@@ -5,6 +5,7 @@ import logging
 from . import Shrinkify
 from .config import ShrinkifyConfig
 from . import playlist as shrinkify_playlist
+from . import tag as shrinkify_tag
 import pprint
 #TODO: global parser options (source/output directories always needed)
 def global_opts(parser: argparse.ArgumentParser):
@@ -39,6 +40,12 @@ def playlist_parser(parser: argparse.ArgumentParser):
     parser.add_argument('Playlist.selected_songs', nargs='*', default=[], metavar="[selected songs]")
     return parser
 
+def tag_parser(parser: argparse.ArgumentParser):
+    parser.add_argument('-m', '--mode', dest='Runtime.mode', default='a', choices=['a', 'r'])
+    parser.add_argument('Runtime.target', type=lambda p: pathlib.Path(p).expanduser() if p != "CURRENT" else shrinkify_tag.enums.AUTOMATIC)
+    parser.add_argument('Runtime.tags', nargs='*', default=[], metavar="[tags]")
+    return parser
+
 def only_shrink():
     ap = argparse.ArgumentParser("shrinkify")
     shrink_parser(ap)
@@ -47,7 +54,7 @@ def only_shrink():
     logging.debug(f'Pre-Config File Configuration values: {vars(ShrinkifyConfig)}')
     ShrinkifyConfig.load_yaml()
     shrink()
-    shrinkify_playlist.PlaylistGenerator().create_playlists()
+    # shrinkify_playlist.PlaylistGenerator().create_playlists()
 
 def only_playlist():
     ap = argparse.ArgumentParser("listify")
@@ -59,7 +66,17 @@ def only_playlist():
     logging.debug(f'Post-Config File Configuration values: {vars(ShrinkifyConfig)}')
     #hand control over to the playlist
     playlist()
-    shrinkify_playlist.PlaylistGenerator().create_playlists()
+    # shrinkify_playlist.PlaylistGenerator().create_playlists()
+
+def only_tag():
+    ap = argparse.ArgumentParser("tagify")
+    tag_parser(ap)
+    ap.parse_args(namespace=ShrinkifyConfig)
+    logging.basicConfig(level=50-(ShrinkifyConfig.verbosity*10))
+    logging.debug(f'Pre-Config File Configuration values: {vars(ShrinkifyConfig)}')
+    ShrinkifyConfig.load_yaml()
+    logging.debug(f'Post-Config File Configuration values: {vars(ShrinkifyConfig)}')
+    tag()
 
 def shrink():
     shrinkify = Shrinkify()
@@ -85,6 +102,16 @@ def playlist():
             raise RuntimeError("Must specify a song to modify playlist with")
         plm.modify()
     playlist.PlaylistGenerator().create_playlists()
+
+def tag():
+    #TODO: make this not suck
+    tag = shrinkify_tag.Tagify()
+    if ShrinkifyConfig.Runtime.mode == 'a':
+        tag.add_tags(ShrinkifyConfig.Runtime.target, ShrinkifyConfig.Runtime.tags)
+    elif ShrinkifyConfig.Runtime.mode == 'r':
+        tag.remove_tags(ShrinkifyConfig.Runtime.target, ShrinkifyConfig.Runtime.tags)
+    tag.generate_all()
+    # shrinkify_playlist.PlaylistGenerator().create_playlists()
     
 def main():
     ap = argparse.ArgumentParser("Shrinkify.py")
@@ -97,6 +124,10 @@ def main():
     playlist_args = subparsers.add_parser('playlist', aliases=['p'])
     playlist_args.set_defaults(cmd='playlist')
     playlist_parser(playlist_args)
+    
+    tag_args = subparsers.add_parser('tag', aliases=['t'])
+    tag_args.set_defaults(cmd='tag')
+    tag_parser(tag_args)
     
     ap.parse_args(namespace=ShrinkifyConfig)
 
@@ -113,6 +144,9 @@ def main():
             
     elif ShrinkifyConfig.cmd == 'playlist':
         playlist()
+    
+    elif ShrinkifyConfig.cmd == 'tag':
+        tag()
 
     #playlist generator
-    shrinkify_playlist.PlaylistGenerator().create_playlists()
+    # # shrinkify_playlist.PlaylistGenerator().create_playlists()
