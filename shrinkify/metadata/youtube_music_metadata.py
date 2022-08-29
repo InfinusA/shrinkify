@@ -19,13 +19,19 @@ class YoutubeMusicMetadata(object):
     def search_match_fetch(self, song_info, source_id, original_id):
         query = ShrinkifyConfig.Metadata.YoutubeMusicMetadata.search_query.format(title=song_info['videoDetails']['title'], artist=song_info['videoDetails']['author'])
         search_results = self.ytm.search(query, filter="songs")
+        selected_song = None
         for result in search_results:
             if result['videoId'] in (source_id, original_id):
                 selected_song = result
                 break
-        else:
+        if ShrinkifyConfig.Metadata.YoutubeMusicMetadata.name_match:
+            for result in search_results:
+                if result['title'] == song_info['videoDetails']['title']:
+                    selected_song = result
+                    break
+            
+        if not selected_song:
             return False
-        
         return selected_song, self.ytm.get_album(selected_song['album']['id'])
         
     

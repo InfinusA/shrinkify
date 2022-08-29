@@ -7,7 +7,7 @@ from .config import ShrinkifyConfig
 from . import playlist as shrinkify_playlist
 from . import tag as shrinkify_tag
 import pprint
-#TODO: global parser options (source/output directories always needed)
+#TODO: fix relative/absolute path discrepancies
 def global_opts(parser: argparse.ArgumentParser):
     parser.add_argument('-s', '--source-folder', dest='source_folder', type=lambda p: pathlib.Path(p).expanduser(), default=ShrinkifyConfig.source_folder)
     parser.add_argument('-o', '--output-folder', dest='output_folder', type=lambda p: pathlib.Path(p).expanduser(), default=ShrinkifyConfig.output_folder)
@@ -48,6 +48,7 @@ def tag_parser(parser: argparse.ArgumentParser):
 
 def only_shrink():
     ap = argparse.ArgumentParser("shrinkify")
+    global_opts(ap)
     shrink_parser(ap)
     ap.parse_args(namespace=ShrinkifyConfig)
     logging.basicConfig(level=50-(ShrinkifyConfig.verbosity*10))
@@ -58,6 +59,7 @@ def only_shrink():
 
 def only_playlist():
     ap = argparse.ArgumentParser("listify")
+    global_opts(ap)
     playlist_parser(ap)
     ap.parse_args(namespace=ShrinkifyConfig)
     logging.basicConfig(level=50-(ShrinkifyConfig.verbosity*10))
@@ -70,6 +72,7 @@ def only_playlist():
 
 def only_tag():
     ap = argparse.ArgumentParser("tagify")
+    global_opts(ap)
     tag_parser(ap)
     ap.parse_args(namespace=ShrinkifyConfig)
     logging.basicConfig(level=50-(ShrinkifyConfig.verbosity*10))
@@ -115,6 +118,7 @@ def tag():
     
 def main():
     ap = argparse.ArgumentParser("Shrinkify.py")
+    global_opts(ap)
     subparsers = ap.add_subparsers(required=True)
 
     shrinkify_args = subparsers.add_parser('shrink', aliases=['s'])

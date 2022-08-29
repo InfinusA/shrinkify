@@ -108,7 +108,7 @@ class Tagify(object):
             
         with output.open('w+') as playlist:
             for file in root.rglob("*"):
-                if not utils.is_valid(file.relative_to(ShrinkifyConfig.output_folder)):
+                if not utils.is_valid(file.relative_to(ShrinkifyConfig.output_folder), exclude_output=False):
                     continue
                 try:
                     songtags = tagdata[str(file.relative_to(ShrinkifyConfig.output_folder).with_suffix(''))]

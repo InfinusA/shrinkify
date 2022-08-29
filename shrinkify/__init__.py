@@ -26,7 +26,16 @@ class Shrinkify(object):
     def __init__(self):
         self.meta_parser = metadata.MetadataProcessor()
     
-    def single_convert(self, filename):
+    def single_convert(self, filename: pathlib.Path):
+        ShrinkifyConfig.cache = None
+        if ShrinkifyConfig.output_folder in filename.parents: #file is the compressed ver
+            basename = filename.stem
+            relative_parents = filename.relative_to(ShrinkifyConfig.output_folder).parent
+            real_dir = pathlib.Path(ShrinkifyConfig.source_folder, relative_parents)
+            try:
+                filename = next(real_dir.glob(f"{basename}.*"))
+            except StopIteration:
+                raise RuntimeError("Parent file not found. Does the source exist?")
         self.recursive_convert(flist=[filename], show_metadata=True)
         # file = pathlib.Path(filename).resolve()
         # root = pathlib.Path('.').resolve().expanduser() if ShrinkifyConfig.source_folder is None else pathlib.Path(ShrinkifyConfig.source_folder).resolve()
@@ -99,7 +108,7 @@ class Shrinkify(object):
                     continue
             if not utils.is_valid(file):
                 continue
-            if not ShrinkifyConfig.Shrinkify.flag_overwrite and output_file.is_file() and not ShrinkifyConfig.Shrinkify.single_file:
+            if (not ShrinkifyConfig.Shrinkify.flag_overwrite) and output_file.is_file() and not ShrinkifyConfig.Shrinkify.single_file:
                 # print('file exists, skipping')
                 continue
             if 'test_cases' in file.parts and ShrinkifyConfig.flag_debug is False:
