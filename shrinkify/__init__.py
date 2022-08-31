@@ -55,14 +55,14 @@ class Shrinkify(object):
         # metadata = self.meta_parser.parse(file, no_cache=True)
         # pprint.pprint(metadata)
         
-        # # if ShrinkifyConfig.flag_simulate:
+        # # if ShrinkifyConfig.simulate:
         # #     time.sleep(ShrinkifyConfig.Shrinkify.throttle_length)
         # #     return
         # output_file.parent.mkdir(exist_ok=True, parents=True)
         # metadata_list = [f"{k}={v}" for k, v in metadata.items() if not k.startswith("_")]
-        # if ShrinkifyConfig.flag_simulate:
+        # if ShrinkifyConfig.simulate:
         #     return
-        # if ShrinkifyConfig.Shrinkify.flag_update_metadata and output_file.is_file():
+        # if ShrinkifyConfig.Shrinkify.update_metadata and output_file.is_file():
         #     #create temp file since ffmpeg can't overwrite in-place
         #     tmp_file = pathlib.Path(root, f'tmp_file{output_file.suffix}')
         #     tmp_file.unlink(missing_ok=True)
@@ -88,7 +88,7 @@ class Shrinkify(object):
         # if ShrinkifyConfig.flag_debug:
         #     print("Waiting for ffmpeg to finish")
         # ffmpeg.communicate()
-        # if ShrinkifyConfig.Shrinkify.flag_update_metadata:
+        # if ShrinkifyConfig.Shrinkify.update_metadata:
         #     tmp_file.unlink(missing_ok=False)
             
             
@@ -138,7 +138,7 @@ class Shrinkify(object):
             output_file.parent.mkdir(exist_ok=True, parents=True)
             metadata_list = [f"{k}={v}" for k, v in metadata.items() if not k.startswith("_")]
             
-            if ShrinkifyConfig.flag_simulate:
+            if ShrinkifyConfig.simulate:
                 time.sleep(ShrinkifyConfig.Shrinkify.throttle_length)
                 continue
             
@@ -146,11 +146,11 @@ class Shrinkify(object):
             #TODO: make me toggleable
             tmp_file = pathlib.Path(output_file.parent, f"shrinkify-tmp{output_file.suffix}")
 
-            ffmpeg_input = output_file if ShrinkifyConfig.Shrinkify.flag_update_metadata and output_file.exists() else file
+            ffmpeg_input = output_file if ShrinkifyConfig.Shrinkify.update_metadata and output_file.exists() else file
             ffmpeg_args = ['ffmpeg', '-hide_banner', '-y', 
                 '-i', str(ffmpeg_input.resolve()), '-i', '-', 
                 '-map', '0:a:0', '-map', '1', '-c:v', 'copy', '-disposition:v:0', 'attached_pic', '-c:a']
-            ffmpeg_args.append("copy" if ShrinkifyConfig.Shrinkify.flag_update_metadata and output_file.exists() else "aac")
+            ffmpeg_args.append("copy" if ShrinkifyConfig.Shrinkify.update_metadata and output_file.exists() else "aac")
                 
             for metadata_val in metadata_list:
                 ffmpeg_args.append('-metadata')
@@ -191,7 +191,7 @@ class Shrinkify(object):
             matched_children = [str(cf) for cf in parent_folder.iterdir() if file.stem == cf.stem and cf.suffix in ShrinkifyConfig.filetypes]
             #below line deletes everything if output folder is also excluded
             if len(matched_children) == 0:# or self.is_invalid(file.relative_to(ShrinkifyConfig.output_folder)): #glob for file without filename, since children have different extensions
-                if ShrinkifyConfig.flag_simulate:
+                if ShrinkifyConfig.simulate:
                     print("Simulating deletion of", file)
                 else:
                     print(f"Deleting {str(file)}")
@@ -200,7 +200,7 @@ class Shrinkify(object):
             
         for folder in tuple(ShrinkifyConfig.output_folder.glob("**")): #will cause errors if generator
             if len(list(folder.iterdir())) == 0:
-                if ShrinkifyConfig.flag_simulate:
+                if ShrinkifyConfig.simulate:
                     print("Simulating deletion of", folder)
                 else:
                     print(f"Deleting empty folder {str(folder)}")

@@ -25,6 +25,22 @@ class Tagify(object):
     def __init__(self) -> None:
         pass
     
+    def list_tags(self, target=pathlib.Path('.')) -> None:
+        if target == enums.AUTOMATIC:
+            target = self.get_current_song()
+        configfile = pathlib.Path(ShrinkifyConfig.config_dir, 'tags.json')
+        tagdata = json.loads(configfile.read_text())
+        tag_list = tuple(item for sublist in tagdata.values() for item in sublist)
+        uniq_tags = set(tag_list)
+        print("Tag List:")
+        for tag in sorted(uniq_tags):
+            print(f"{tag} - {tag_list.count(tag)} songs tagged")
+        try:
+            selected = tagdata[str(target.relative_to(ShrinkifyConfig.output_folder).with_suffix(''))]
+        except (KeyError, ValueError):
+            return
+        print(f"\nTags in \"{target.name}\": {', '.join(selected)}")
+    
     def get_current_song(self) -> pathlib.Path:
         if not DBUS_ENABLED:
             raise RuntimeError("dbus is not enabled. Are you on an mpris-supported system and do you have the dbus module installed?")

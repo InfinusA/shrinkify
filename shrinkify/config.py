@@ -25,13 +25,13 @@ class _ShrinkifyConfig(NestedNamespace):
         #directory that holds configuratian
         self.config_dir = pathlib.Path(pathlib.Path.home(), '.config/shrinkify')
         #simulate conversion
-        self.flag_simulate = False
+        self.simulate = False
         #folder that is parsed and converted
         self.source_folder = pathlib.Path(pathlib.Path.home(), 'Music')
         #folder to output converted files
         self.output_folder = pathlib.Path(pathlib.Path.home(), 'Music/compressed')
         #debug mode (kinda useless)
-        self.flag_debug = False
+        self.debug = False
         #verbosity on a scale of 0 to 5
         self.verbosity = logging.WARNING//10
         #folders to exclude from conversion
@@ -93,8 +93,8 @@ class _ShrinkifyConfig(NestedNamespace):
             self.continue_from = None
             self.single_file = None
             self.throttle_length = 0
-            self.flag_delete_nonexisting = False
-            self.flag_update_metadata = False
+            self.delete_nonexisting = False
+            self.update_metadata = False
             self.flag_overwrite = False
     
     class _Metadata(NestedNamespace):
