@@ -111,7 +111,7 @@ class Shrinkify(object):
             if (not ShrinkifyConfig.Shrinkify.flag_overwrite) and output_file.is_file() and not ShrinkifyConfig.Shrinkify.single_file:
                 # print('file exists, skipping')
                 continue
-            if 'test_cases' in file.parts and ShrinkifyConfig.flag_debug is False:
+            if 'test_cases' in file.parts and ShrinkifyConfig.debug is False:
                 continue
                     
             #continue scripts
@@ -158,14 +158,14 @@ class Shrinkify(object):
             ffmpeg_args.append(str(tmp_file.resolve()))
             
             print("Converting File")
-            if ShrinkifyConfig.flag_debug:
+            if ShrinkifyConfig.debug:
                 print("About to run ffmpeg")
                 ffmpeg = subprocess.Popen(ffmpeg_args, stdin=subprocess.PIPE)
             else:
                 logging.info("Beginning conversion")
                 ffmpeg = subprocess.Popen(ffmpeg_args, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             metadata['_thumbnail_image'].save(ffmpeg.stdin, format='png')#write thumbnail to stdin, saving having to write to file
-            if ShrinkifyConfig.flag_debug:
+            if ShrinkifyConfig.debug:
                 print("Waiting for ffmpeg to finish")
             ffmpeg.communicate()
             logging.info("Finished conversion")

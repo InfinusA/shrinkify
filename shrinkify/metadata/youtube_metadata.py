@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 #fetch metadata for youtube-related services
+import logging
 import pathlib
 import json
 import re
@@ -85,6 +86,8 @@ class YoutubeMetadata(object):
                     return json_cache[video_id]
             video_resp = requests.get(f"https://youtube.googleapis.com/youtube/v3/videos?part=snippet%2CcontentDetails%2Cstatistics&id={video_id}&key={self.api_key}", headers={'Accept': 'application/json'})
             video_data = json.loads(video_resp.content)
+            logging.debug(video_data)
+            logging.debug(f"https://youtube.googleapis.com/youtube/v3/videos?part=snippet%2CcontentDetails%2Cstatistics&id={video_id}&key={self.api_key}")
             if 'error' in video_data: #don't save this to cache because it screws up everything else
                 return video_data
             

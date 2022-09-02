@@ -49,6 +49,7 @@ class ShrinkifyExec(object):
         ShrinkifyConfig.load_yaml()
         self.parser.parse_args(namespace=ShrinkifyConfig)
         logging.basicConfig(level=50-(ShrinkifyConfig.verbosity*10))
+        logging.debug(dir(ShrinkifyConfig))
         if self.mode == self.enums.MAIN:
             self.mode = ShrinkifyConfig.cmd
         #purposeful if here
