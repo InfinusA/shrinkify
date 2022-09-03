@@ -70,6 +70,8 @@ class ShrinkifyExec(object):
                 tagify.remove_tags(ShrinkifyConfig.Runtime.target, ShrinkifyConfig.Runtime.tags)
             elif ShrinkifyConfig.Runtime.mode == 'l':
                 tagify.list_tags(ShrinkifyConfig.Runtime.target)
+            elif ShrinkifyConfig.Runtime.mode == 'b':
+                tagify.batch_tag()
             tagify.generate_all()
         else:
             raise RuntimeError(f"Unknown Mode: {self.mode}")
@@ -95,13 +97,15 @@ class ShrinkifyExec(object):
         parser.add_argument('--single-file',    dest='Runtime.single_file', type=lambda p: pathlib.Path(p).expanduser(), help="Only convert a single file.")
         
         metadata_args = parser.add_argument_group('Metadata')
-        metadata_args.add_argument('--youtube-api-key', dest='Metadata.YoutubeMetadata.api_key')
+        metadata_args.add_argument('--youtube-api-key', dest='Metadata.YoutubeMetadata.api_key', default=ShrinkifyConfig.Metadata.YoutubeMetadata.api_key)
         metadata_args.add_argument('--thumbnail-mode', type=int, dest='Metadata.ThumbnailGenerator.generator_mode', default=ShrinkifyConfig.Metadata.ThumbnailGenerator.generator_mode)
         return parser
         
     def tag_opts(self, parser):
-        parser.add_argument('-m', '--mode', dest='Runtime.mode', default='a', choices=['a', 'r', 'l'])
+        #TODO: seperate parsers
+        parser.add_argument('-m', '--mode', dest='Runtime.mode', default='a', choices=['a', 'r', 'l', 'b'])
         parser.add_argument('Runtime.target', type=lambda p: pathlib.Path(p).expanduser() if p != "CURRENT" else tag.enums.AUTOMATIC)
         parser.add_argument('Runtime.tags', nargs='*', default=[], metavar="[tags]")
+        parser.add_argument('--continue-from',  dest='Runtime.continue_from', help="Continue from the file with this filename", type=lambda p: pathlib.Path(p).expanduser())
         return parser
     

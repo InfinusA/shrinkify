@@ -25,6 +25,19 @@ class Tagify(object):
     def __init__(self) -> None:
         pass
     
+    def batch_tag(self):
+        file_list = tuple(filter(lambda *args, **kwargs: utils.is_valid(*args, exclude_output=False, **kwargs), sorted(ShrinkifyConfig.output_folder.rglob("*"))))
+        if ShrinkifyConfig.Runtime.continue_from:
+            try:
+                file_list = file_list[file_list.index(ShrinkifyConfig.Runtime.continue_from):]
+            except ValueError:
+                contfile = next(e for e in file_list if e.name == ShrinkifyConfig.Runtime.continue_from.name)
+                file_list = file_list[file_list.index(contfile):]
+        for file in file_list:
+            print(f"Current File: {file.name}")
+            taglist = input("Tags (seperated by commas): ").split(',')
+            self.add_tags(file, taglist)
+    
     def list_tags(self, target=pathlib.Path('.')) -> None:
         if target == enums.AUTOMATIC:
             target = self.get_current_song()
