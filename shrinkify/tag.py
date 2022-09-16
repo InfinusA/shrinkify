@@ -36,6 +36,8 @@ class Tagify(object):
         for file in file_list:
             print(f"Current File: {file.name}")
             taglist = input("Tags (seperated by commas): ").split(',')
+            if taglist in ([], [""]):
+                continue
             self.add_tags(file, taglist)
     
     def list_tags(self, target=pathlib.Path('.')) -> None:

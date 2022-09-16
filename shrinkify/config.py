@@ -116,12 +116,17 @@ class _ShrinkifyConfig(NestedNamespace):
             def __init__(self):
                 self.enabled = True
                 self.api_key = ''
+                self.use_channel_image = False
         class _YoutubeMusicMetadata(NestedNamespace):
             def __init__(self):
                 self.method = 1
                 self.search_query = "{title} - {artist}"
                 self.enabled = True
                 self.name_match = True
+                self.search_name_match = False #YouTube has selection bias (and name conflicts, eg "pneumonoultramicroscopicsilicovolcanoconiosis" or "carbon" (both supposed to be by Dasu))
+                self.similarity_match = False #costly but marginally better results than substring match in some titles
+                self.similarity_threshold = 0.75
+                self.substring_match = False #dangerous, often hits incorrect matches especially with search
                 self.override_enabled = True
                 self.override_artist = []
                 self.override_song = []
@@ -144,7 +149,7 @@ class _ShrinkifyConfig(NestedNamespace):
     class _Runtime(NestedNamespace):
         '''THIS CLASS SHOULD NOT BE USED IN THE CONFIG FILE AND IS ONLY FOR RUNTIME OPTIONS'''
         def __init__(self) -> None:
-            pass
+            self.continue_from = None
         
 ShrinkifyConfig = _ShrinkifyConfig()
 #global instance

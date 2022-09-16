@@ -28,6 +28,7 @@ class Shrinkify(object):
     
     def single_convert(self, filename: pathlib.Path):
         ShrinkifyConfig.cache = None
+        ShrinkifyConfig.Shrinkify.flag_overwrite = True
         if ShrinkifyConfig.output_folder in filename.parents: #file is the compressed ver
             basename = filename.stem
             relative_parents = filename.relative_to(ShrinkifyConfig.output_folder).parent
@@ -37,60 +38,6 @@ class Shrinkify(object):
             except StopIteration:
                 raise RuntimeError("Parent file not found. Does the source exist?")
         self.recursive_convert(flist=[filename], show_metadata=True)
-        # file = pathlib.Path(filename).resolve()
-        # root = pathlib.Path('.').resolve().expanduser() if ShrinkifyConfig.source_folder is None else pathlib.Path(ShrinkifyConfig.source_folder).resolve()
-        # output_folder = pathlib.Path(root, 'compressed').expanduser().resolve() if ShrinkifyConfig.output_folder is None else pathlib.Path(ShrinkifyConfig.output_folder)
-        # output_file = pathlib.Path(output_folder, file.relative_to(root).with_suffix('.m4a'))
-        
-        # if output_folder in file.parents: #file is the compressed ver
-        #     output_file = file
-        #     basename = file.stem
-        #     relative_parents = file.relative_to(output_folder).parent
-        #     real_dir = pathlib.Path(root, relative_parents)
-        #     try:
-        #         file = next(real_dir.glob(f"{basename}.*"))
-        #     except StopIteration:
-        #         raise RuntimeError("Parent file not found. Does the source exist?")
-        
-        # metadata = self.meta_parser.parse(file, no_cache=True)
-        # pprint.pprint(metadata)
-        
-        # # if ShrinkifyConfig.simulate:
-        # #     time.sleep(ShrinkifyConfig.Shrinkify.throttle_length)
-        # #     return
-        # output_file.parent.mkdir(exist_ok=True, parents=True)
-        # metadata_list = [f"{k}={v}" for k, v in metadata.items() if not k.startswith("_")]
-        # if ShrinkifyConfig.simulate:
-        #     return
-        # if ShrinkifyConfig.Shrinkify.update_metadata and output_file.is_file():
-        #     #create temp file since ffmpeg can't overwrite in-place
-        #     tmp_file = pathlib.Path(root, f'tmp_file{output_file.suffix}')
-        #     tmp_file.unlink(missing_ok=True)
-        #     shutil.copyfile(output_file, tmp_file)
-        #     ffmpeg_args = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', 
-        #         '-i', str(tmp_file.resolve()), '-i', '-', 
-        #         '-map', '0:a:0', '-map', '1', '-c:v', 'copy', '-disposition:v:0', 'attached_pic', '-c:a', 'copy']
-        # else:
-        #     ffmpeg_args = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', 
-        #         '-i', str(file.resolve()), '-i', '-', 
-        #         '-map', '0:a:0', '-map', '1', '-c:v', 'copy', '-disposition:v:0', 'attached_pic', '-c:a', 'aac']
-            
-        # for metadata_val in metadata_list:
-        #     ffmpeg_args.append('-metadata')
-        #     ffmpeg_args.append(metadata_val)
-        # ffmpeg_args.append(str(output_file))
-        # if ShrinkifyConfig.flag_debug:
-        #     print("About to run ffmpeg")
-        #     ffmpeg = subprocess.Popen(ffmpeg_args, stdin=subprocess.PIPE)
-        # else:
-        #     ffmpeg = subprocess.Popen(ffmpeg_args, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        # metadata['_thumbnail_image'].save(ffmpeg.stdin, format='png')#write thumbnail to stdin, saving having to write to file
-        # if ShrinkifyConfig.flag_debug:
-        #     print("Waiting for ffmpeg to finish")
-        # ffmpeg.communicate()
-        # if ShrinkifyConfig.Shrinkify.update_metadata:
-        #     tmp_file.unlink(missing_ok=False)
-            
             
     def recursive_convert(self, flist=None, show_metadata=False):
         root = ShrinkifyConfig.source_folder
@@ -99,32 +46,27 @@ class Shrinkify(object):
         if flist is None:
             flist = tuple(root.rglob("*"))
         #TODO:filter out nonvalid beforehand
+        flist = tuple(filter(lambda x: utils.is_valid(x, exclude_output=True, overwrite=ShrinkifyConfig.Shrinkify.flag_overwrite), flist))
+        flist = sorted(flist)
         for file_index, file in enumerate(flist):
-            output_file = pathlib.Path(output_folder, file.relative_to(root).with_suffix('.m4a'))
-            if ShrinkifyConfig.Shrinkify.continue_from is not None and not continue_flag: #we are doing a continue and it hasn't been disabled
-                if file.resolve() == pathlib.Path(ShrinkifyConfig.Shrinkify.continue_from).expanduser().resolve():
+            if ShrinkifyConfig.Runtime.continue_from is not None and not continue_flag: #we are doing a continue and it hasn't been disabled
+                if file.resolve() == pathlib.Path(ShrinkifyConfig.Runtime.continue_from).expanduser().resolve():
                     continue_flag = True
                 else:
                     continue
-            if not utils.is_valid(file):
-                continue
-            if (not ShrinkifyConfig.Shrinkify.flag_overwrite) and output_file.is_file() and not ShrinkifyConfig.Shrinkify.single_file:
-                # print('file exists, skipping')
-                continue
-            if 'test_cases' in file.parts and ShrinkifyConfig.debug is False:
-                continue
+            output_file = utils.resolve_shrunk(file)
                     
             #continue scripts
             print(f"Converting #{file_index}/{len(flist)} {file.relative_to(root)}")
             # logging.debug(file)
             print("Fetching metadata")
-            while True:
-                try:
-                    metadata = self.meta_parser.parse(file)
-                    break
-                except Exception as e:
-                    logging.error(f"Error when fetching metadata: {type(e).__name__}: {e}")
-                    time.sleep(ShrinkifyConfig.Shrinkify.throttle_length)
+            # while True:
+            #     try:
+            metadata = self.meta_parser.parse(file)
+                #     break
+                # except Exception as e:
+                #     logging.error(f"Error when fetching metadata: {type(e).__name__}: {e}")
+                #     time.sleep(ShrinkifyConfig.Shrinkify.throttle_length)
             if show_metadata:
                 print("\nMetadata Info:")
                 for opt in metadata.items():
@@ -133,8 +75,6 @@ class Shrinkify(object):
                     print(f"{opt[0]}: {opt[1]}")
                 print("")
                     
-            thumb_data = BytesIO()
-            # metadata['_thumbnail_image'].save(thumb_data, format='png')
             output_file.parent.mkdir(exist_ok=True, parents=True)
             metadata_list = [f"{k}={v}" for k, v in metadata.items() if not k.startswith("_")]
             

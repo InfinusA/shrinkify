@@ -22,6 +22,7 @@ class ShrinkifyExec(object):
         SHRINK = "Shrinkify"
         TAG = "Tagify"
     def __init__(self, mode) -> None:
+        ShrinkifyConfig.load_yaml()
         self.mode = mode
         self.parser = argparse.ArgumentParser(mode)
         self.parser = self.global_opts(self.parser)
@@ -46,7 +47,6 @@ class ShrinkifyExec(object):
             raise RuntimeError(f"Unknown Mode: {mode}")
     
     def parse(self):
-        ShrinkifyConfig.load_yaml()
         self.parser.parse_args(namespace=ShrinkifyConfig)
         logging.basicConfig(level=50-(ShrinkifyConfig.verbosity*10))
         logging.debug(dir(ShrinkifyConfig))

@@ -43,15 +43,10 @@ class YoutubeMetadata(object):
            shrinkify_metadata['date'] = snippet['publishedAt'][:4]
            shrinkify_metadata['comment'] = snippet['description']
         if not no_thumb:
-            if ShrinkifyConfig.cache:
-                cache_file = pathlib.Path(ShrinkifyConfig.cache, f'{video_id}.png')
-                if cache_file.is_file():
-                    raw_thumbnail = cache_file.read_bytes()
-                else:
-                    raw_thumbnail = requests.get(max(snippet['thumbnails'].values(), key=lambda x: x['height']+x['width'])['url']).content
-                    cache_file.write_bytes(raw_thumbnail)
+            if ShrinkifyConfig.Metadata.YoutubeMetadata.use_channel_image:
+                raw_thumbnail = self.ytc.get_channel_icon(snippet['channelId'])
             else:
-                raw_thumbnail = requests.get(max(snippet['thumbnails'].values(), key=lambda x: x['height']+x['width'])['url']).content
+                raw_thumbnail = self.ytc.get_video_thumbnail(video_id)
 
             shrinkify_metadata['_thumbnail_image'] = data_to_thumbnail(raw_thumbnail)
             
@@ -65,13 +60,30 @@ class YoutubeMetadata(object):
             self.cache_state = True if self.cache_file else False
             
         def set_cache_state(self, state: bool):
-            self.cache_state = state
+            self.cache_state = state and ShrinkifyConfig.cache
         
         def set_cache_init(self):
             '''
             set cache state to the initial state
             '''
             self.cache_state = True if self.cache_file else False
+        
+        def get_channel_icon(self, channel_id):
+            if self.cache_state and pathlib.Path(ShrinkifyConfig.cache, f'{channel_id}.png').is_file():
+                return pathlib.Path(ShrinkifyConfig.cache, f'{channel_id}.png').read_bytes()
+            icon_json = json.loads(requests.get(f"https://www.googleapis.com/youtube/v3/channels?part=snippet&id={channel_id}&fields=items%2Fsnippet%2Fthumbnails&key={self.api_key}").content)
+            cache_data = requests.get(max(icon_json['items'][0]['snippet']['thumbnails'].values(), key=lambda o: o['height']+o['width'])['url']).content
+            if self.cache_state and pathlib.Path(ShrinkifyConfig.cache, f'{channel_id}.png'):
+                pathlib.Path(ShrinkifyConfig.cache, f'{channel_id}.png').write_bytes(cache_data)
+            return cache_data
+
+        def get_video_thumbnail(self, video_id):
+            if self.cache_state and pathlib.Path(ShrinkifyConfig.cache, f'{video_id}.png').is_file():
+                return pathlib.Path(ShrinkifyConfig.cache, f'{video_id}.png').read_bytes()
+            cache_data = requests.get(f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg").content
+            if self.cache_state and pathlib.Path(ShrinkifyConfig.cache, f'{video_id}.png').is_file():
+                pathlib.Path(ShrinkifyConfig.cache, f'{video_id}.png').write_bytes(cache_data)
+            return cache_data
             
         def get_video_data(self, video_id):
             if self.cache_file is None:

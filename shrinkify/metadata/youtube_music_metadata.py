@@ -7,6 +7,7 @@ import logging
 
 from .shrink_utils import data_to_thumbnail
 from ..config import ShrinkifyConfig
+from .. import utils
 
 import sys
 
@@ -20,13 +21,14 @@ class YoutubeMusicMetadata(object):
         query = ShrinkifyConfig.Metadata.YoutubeMusicMetadata.search_query.format(title=song_info['videoDetails']['title'], artist=song_info['videoDetails']['author'])
         search_results = self.ytm.search(query, filter="songs")
         selected_song = None
+        
         for result in search_results:
             if result['videoId'] in (source_id, original_id):
                 selected_song = result
                 break
-        if ShrinkifyConfig.Metadata.YoutubeMusicMetadata.name_match:
+        for method in utils.match_ytm_methods(ShrinkifyConfig.Metadata.YoutubeMusicMetadata.search_name_match):
             for result in search_results:
-                if result['title'] == song_info['videoDetails']['title']:
+                if method(result['title'], song_info['videoDetails']['title']):
                     selected_song = result
                     break
             
@@ -93,43 +95,44 @@ class YoutubeMusicMetadata(object):
                 if songfound:
                     break
         
-        if not songfound and ShrinkifyConfig.Metadata.YoutubeMusicMetadata.name_match:
-            if 'albums' in artist_info: #most valid artists should have albums
-                logging.info(f"{source_id}: Searching albums")
-                #long line but basically
-                #if params exists, it is a key used to get all the artist's albums, so use it to fetch the artist's albums
-                #if not, all are already available and we just use the available ones
-                albums = self.ytm.get_artist_albums(artist_id, self.ytm.get_params(artist_id)) \
-                    if 'params' in artist_info['albums'] else artist_info['albums']['results']
-                for album in albums:
-                    album_songs = self.ytm.get_album(album['browseId'])
-                    for song in album_songs['tracks']:
-                        if song_info['videoDetails']['title'] == song['title']: #some songs are strange and the url links to the original, not the yt music ver
-                            logging.info(f"{source_id}: Found song in album")
-                            songfound = True
-                            target_song = song
-                            target_album = album
+        if not songfound:
+            for method in utils.match_ytm_methods(ShrinkifyConfig.Metadata.YoutubeMusicMetadata.name_match):
+                if 'albums' in artist_info: #most valid artists should have albums
+                    logging.info(f"{source_id}: Searching albums")
+                    #long line but basically
+                    #if params exists, it is a key used to get all the artist's albums, so use it to fetch the artist's albums
+                    #if not, all are already available and we just use the available ones
+                    albums = self.ytm.get_artist_albums(artist_id, self.ytm.get_params(artist_id)) \
+                        if 'params' in artist_info['albums'] else artist_info['albums']['results']
+                    for album in albums:
+                        album_songs = self.ytm.get_album(album['browseId'])
+                        for song in album_songs['tracks']:
+                            if method(song['title'], song_info['videoDetails']['title']): #some songs are strange and the url links to the original, not the yt music ver
+                                logging.info(f"{source_id}: Found song in album")
+                                songfound = True
+                                target_song = song
+                                target_album = album
+                                break
+                        if songfound:
                             break
-                    if songfound:
-                        break
+                
+                if not songfound and 'singles' in artist_info:
+                    logging.info(f"{source_id}: Searching singles")
+                    if self.ytm.get_params(artist_id, singles=True):
+                        songs = self.ytm.get_artist_albums(artist_id, self.ytm.get_params(artist_id, singles=True))
+                    else:
+                        songs = artist_info['singles']['results']
+                    for song in songs:
+                        song_data = self.ytm.get_album(song['browseId'])
+                        for track in song_data['tracks']:
+                            if method(song['title'], song_info['videoDetails']['title']):
+                                songfound = True
+                                target_song = track
+                                target_album = song
+                                break
+                        if songfound:
+                            break
             
-            if not songfound and 'singles' in artist_info:
-                logging.info(f"{source_id}: Searching singles")
-                if self.ytm.get_params(artist_id, True):
-                    songs = self.ytm.get_artist_albums(artist_id, self.ytm.get_params(artist_id, True))
-                else:
-                    songs = artist_info['singles']['results']
-                for song in songs:
-                    song_data = self.ytm.get_album(song['browseId'])
-                    for track in song_data['tracks']:
-                        if song_info['videoDetails']['title'] == track['title']:
-                            songfound = True
-                            target_song = track
-                            target_album = song
-                            break
-                    if songfound:
-                        break
-                    
         if not songfound: #no song found at all
             logging.info(f"{source_id}: No song found")
             return False
