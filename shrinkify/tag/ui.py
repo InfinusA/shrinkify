@@ -47,8 +47,8 @@ class Shiggy(object):
         #tcanvas.create_rectangle((0,0,900,900), fill='red')
         tcanvas.create_window((0, 0), window=tframe, anchor="nw")
         self.tag_buttons = []
-        for tag in self.tagify.get_all_tags():
-            b = ttk.Checkbutton(tframe, text=tag)
+        for ix, tag in enumerate(self.tagify.get_all_tags()):
+            b = ttk.Checkbutton(tframe, text=tag, command=lambda ix=ix, tag=tag: self.set_tag(ix, tag))
             b.checked = tk.BooleanVar()
             b.configure(var=b.checked)
             b.pack(side='left')
@@ -58,11 +58,22 @@ class Shiggy(object):
         tcanvas.grid(row=0, column=0, columnspan=2, sticky='ew')
         tframe_scroll.grid(row=1, column=0, columnspan=2, sticky='ew')
 
-    def update_tag(self, ev):
+    def set_tag(self, ix, tag):
+        enabled = bool(self.tag_buttons[ix][0].checked.get())
         try:
-            w = ev.widget
-        except AttributeError:
-            w = ev
+            index = int(self.lbox.curselection()[0])
+        except IndexError:
+            index = 0
+        if enabled:
+            self.tagify.add_tags(self.flist[index], [tag])
+        else:
+            try:
+                self.tagify.remove_tags(self.flist[index], [tag])
+            except RuntimeError:
+                pass
+
+    def update_tag(self, ev):
+        w = self.lbox
         try:
             index = int(w.curselection()[0])
         except IndexError:
@@ -80,14 +91,14 @@ class Shiggy(object):
         else:
             self.flist = sorted(filter(lambda f: utils.is_valid(f, exclude_output=False, overwrite=True), ShrinkifyConfig.output_folder.rglob('*')))
         lbox_scroll = ttk.Scrollbar(self.mlist)
-        lbox = tk.Listbox(self.mlist, yscrollcommand=lbox_scroll.set)
+        self.lbox = tk.Listbox(self.mlist, yscrollcommand=lbox_scroll.set)
         
         for row, value in enumerate(self.flist):
-            lbox.insert(tk.END, value.relative_to(ShrinkifyConfig.output_folder))
-        lbox_scroll.config(command=lbox.yview)
-        lbox.grid(column=0, row=2, sticky='nsew')
+            self.lbox.insert(tk.END, value.relative_to(ShrinkifyConfig.output_folder))
+        lbox_scroll.config(command=self.lbox.yview)
+        self.lbox.grid(column=0, row=2, sticky='nsew')
         lbox_scroll.grid(column=1, row=2, sticky='ns')
         
-        lbox.bind('<<ListboxSelect>>', self.update_tag)
-        lbox.activate(0)
-        self.update_tag(lbox)
+        self.lbox.bind('<<ListboxSelect>>', self.update_tag)
+        self.lbox.activate(0)
+        self.update_tag(self.lbox)
