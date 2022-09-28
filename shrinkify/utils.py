@@ -5,19 +5,20 @@ from .config import ShrinkifyConfig
 
 def is_valid(file: pathlib.Path, exclude_output=True, overwrite=False) -> bool:
     '''Check if file is valid for conversion'''
-    initial = file.is_file() and \
-        file.suffix in ShrinkifyConfig.filetypes and \
-        (ShrinkifyConfig.Shrinkify.flag_overwrite or ShrinkifyConfig.Shrinkify.update_metadata or ShrinkifyConfig.Runtime.single_file or not resolve_shrunk(file).is_file())
+    valid = file.is_file()
+    valid = valid and file.suffix in ShrinkifyConfig.filetypes
+    valid = valid and (ShrinkifyConfig.Shrinkify.flag_overwrite or ShrinkifyConfig.Shrinkify.update_metadata or ShrinkifyConfig.Runtime.single_file or not resolve_shrunk(file).is_file() or overwrite)
     
     if exclude_output:
         exclude = ShrinkifyConfig.exclude + [ShrinkifyConfig.output_folder.name]
     else:
         exclude = ShrinkifyConfig.exclude
-    output = initial and not bool(set(exclude).intersection(file.parts))
-    return output
+    valid = valid and not bool(set(exclude).intersection(file.parts))
+    return valid
 
-def resolve_shrunk(input: pathlib.Path):
-    output = pathlib.Path(ShrinkifyConfig.output_folder, input.relative_to(ShrinkifyConfig.source_folder).with_suffix('.m4a'))
+def resolve_shrunk(input_path: pathlib.Path):
+    #TODO: FIXME: relative conflict again
+    output = pathlib.Path(ShrinkifyConfig.output_folder, input_path.relative_to(ShrinkifyConfig.source_folder).with_suffix('.m4a') if input_path.is_absolute() else input_path)
     return output
 
 def _similarity_match(str1, str2):

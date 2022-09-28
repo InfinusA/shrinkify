@@ -150,6 +150,8 @@ class _ShrinkifyConfig(NestedNamespace):
         '''THIS CLASS SHOULD NOT BE USED IN THE CONFIG FILE AND IS ONLY FOR RUNTIME OPTIONS'''
         def __init__(self) -> None:
             self.continue_from = None
+            self.single_file = False
+            self.mode = None
         
 ShrinkifyConfig = _ShrinkifyConfig()
 #global instance

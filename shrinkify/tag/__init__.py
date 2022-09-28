@@ -11,8 +11,8 @@ except ImportError:
     DBUS_ENABLED = False
 from urllib.parse import quote, unquote
 
-from . import utils
-from .config import ShrinkifyConfig
+from .. import utils
+from ..config import ShrinkifyConfig
 
 
 class enums(enum.Enum):
@@ -31,7 +31,7 @@ class Tagify(object):
             try:
                 file_list = file_list[file_list.index(ShrinkifyConfig.Runtime.continue_from):]
             except ValueError:
-                contfile = next(e for e in file_list if e.name == ShrinkifyConfig.Runtime.continue_from.name)
+                contfile = next(e for e in file_list if e.stem == ShrinkifyConfig.Runtime.continue_from.stem)
                 file_list = file_list[file_list.index(contfile):]
         for file in file_list:
             print(f"Current File: {file.name}")
@@ -39,6 +39,21 @@ class Tagify(object):
             if taglist in ([], [""]):
                 continue
             self.add_tags(file, taglist)
+            
+    def get_all_tags(self):
+        configfile = pathlib.Path(ShrinkifyConfig.config_dir, 'tags.json')
+        tagdata = json.loads(configfile.read_text())
+        tag_list = tuple(item for sublist in tagdata.values() for item in sublist)
+        return sorted(set(tag_list))
+    
+    def get_song_tags(self, target):
+        configfile = pathlib.Path(ShrinkifyConfig.config_dir, 'tags.json')
+        tagdata = json.loads(configfile.read_text())
+        try:
+            selected = tagdata[str(target.relative_to(ShrinkifyConfig.output_folder).with_suffix(''))]
+        except KeyError:
+            selected = []
+        return selected
     
     def list_tags(self, target=pathlib.Path('.')) -> None:
         if target == enums.AUTOMATIC:
@@ -139,7 +154,7 @@ class Tagify(object):
             
         with output.open('w+') as playlist:
             for file in root.rglob("*"):
-                if not utils.is_valid(file.relative_to(ShrinkifyConfig.output_folder), exclude_output=False):
+                if not utils.is_valid(file, exclude_output=False, overwrite=True):
                     continue
                 try:
                     songtags = tagdata[str(file.relative_to(ShrinkifyConfig.output_folder).with_suffix(''))]

@@ -6,6 +6,7 @@ import enum
 
 from . import Shrinkify, playlist, tag
 from .config import ShrinkifyConfig
+from .tag import ui as Shiggy #if u know u know
 
 #TODO: normalize config names
 
@@ -61,6 +62,8 @@ class ShrinkifyExec(object):
                 shrinkify.recursive_convert()
             if ShrinkifyConfig.Shrinkify.delete_nonexisting:
                 shrinkify.recursive_delete()
+            
+            tag.Tagify().generate_all()
                 
         elif self.mode == self.enums.TAG:
             tagify = tag.Tagify()
@@ -72,6 +75,10 @@ class ShrinkifyExec(object):
                 tagify.list_tags(ShrinkifyConfig.Runtime.target)
             elif ShrinkifyConfig.Runtime.mode == 'b':
                 tagify.batch_tag()
+            elif ShrinkifyConfig.Runtime.mode == 'g':
+                pass #just generate
+            elif ShrinkifyConfig.Runtime.mode == 'u':
+                Shiggy.exec()
             tagify.generate_all()
         else:
             raise RuntimeError(f"Unknown Mode: {self.mode}")
@@ -103,7 +110,7 @@ class ShrinkifyExec(object):
         
     def tag_opts(self, parser):
         #TODO: seperate parsers
-        parser.add_argument('-m', '--mode', dest='Runtime.mode', default='a', choices=['a', 'r', 'l', 'b'])
+        parser.add_argument('-m', '--mode', dest='Runtime.mode', default='a', choices=['a', 'r', 'l', 'b', 'g', 'u'])
         parser.add_argument('Runtime.target', type=lambda p: pathlib.Path(p).expanduser() if p != "CURRENT" else tag.enums.AUTOMATIC)
         parser.add_argument('Runtime.tags', nargs='*', default=[], metavar="[tags]")
         parser.add_argument('--continue-from',  dest='Runtime.continue_from', help="Continue from the file with this filename", type=lambda p: pathlib.Path(p).expanduser())
