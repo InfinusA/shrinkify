@@ -38,13 +38,19 @@ class Shiggy(object):
         
         self.regen_tag()
         self.regen_list()
+
+    def generate_sidebar(self):
+        playlists = self.tagify.get_playlists()
+        playlists.insert(0, None)
+        for list in playlists:
+            rb = ttk.Radiobutton(self.sidebar)
+        pass
         
     def regen_tag(self):
         tcanvas = tk.Canvas(self.mlist)
         tframe = ttk.Frame(tcanvas)
         tframe_scroll = ttk.Scrollbar(self.mlist, orient='horizontal', command=tcanvas.xview)
         tframe.bind("<Configure>", lambda _: tcanvas.configure(scrollregion=tcanvas.bbox("all"), height=tframe.winfo_height()))
-        #tcanvas.create_rectangle((0,0,900,900), fill='red')
         tcanvas.create_window((0, 0), window=tframe, anchor="nw")
         self.tag_buttons = []
         for ix, tag in enumerate(self.tagify.get_all_tags()):

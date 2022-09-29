@@ -143,7 +143,12 @@ class Tagify(object):
     @staticmethod
     def _format_song_string(song: str) -> str:
         return f"{quote(song).replace('%2F', '/')}" if ShrinkifyConfig.Playlist.escape_codes else song
-      
+    
+    def get_playlists(self):
+        listfile = pathlib.Path(ShrinkifyConfig.config_dir, "playlists.json")
+        playlists = json.loads(listfile.read_text('utf8'))
+        return list(playlists.keys())
+
     def generate_playlist(self, mode: int, tags: typing.Iterable, output: pathlib.Path) -> None:
         configfile = pathlib.Path(ShrinkifyConfig.config_dir, 'tags.json')
         root = ShrinkifyConfig.output_folder
