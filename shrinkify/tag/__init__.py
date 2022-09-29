@@ -23,7 +23,14 @@ class enums(enum.Enum):
 #TODO: more advanced filtering (INCLUDE if all tags, EXCLUDE if all tags, etc)
 class Tagify(object):
     def __init__(self) -> None:
-        pass
+        self.configfile = pathlib.Path(ShrinkifyConfig.config_dir, 'tags.json')
+        self.listfile = pathlib.Path(ShrinkifyConfig.config_dir, "playlists.json")
+    
+    def get_all_songs(self):
+        return json.loads(self.configfile.read_text())['songs']
+    
+    def get_all_tags(self):
+        return json.loads(self.configfile.read_text())['tags']
     
     def batch_tag(self):
         file_list = tuple(filter(lambda *args, **kwargs: utils.is_valid(*args, exclude_output=False, **kwargs), sorted(ShrinkifyConfig.output_folder.rglob("*"))))
@@ -40,15 +47,9 @@ class Tagify(object):
                 continue
             self.add_tags(file, taglist)
             
-    def get_all_tags(self):
-        configfile = pathlib.Path(ShrinkifyConfig.config_dir, 'tags.json')
-        tagdata = json.loads(configfile.read_text())
-        tag_list = tuple(item for sublist in tagdata.values() for item in sublist)
-        return sorted(set(tag_list))
     
-    def get_song_tags(self, target):
-        configfile = pathlib.Path(ShrinkifyConfig.config_dir, 'tags.json')
-        tagdata = json.loads(configfile.read_text())
+    def get_song_tags(self, target: pathlib.Path):
+        tagdata = self.get_all_songs()
         try:
             selected = tagdata[str(target.relative_to(ShrinkifyConfig.output_folder).with_suffix(''))]
         except KeyError:
@@ -103,17 +104,13 @@ class Tagify(object):
                 target = target.relative_to(ShrinkifyConfig.source_folder).with_suffix('')
             except ValueError:
                 raise RuntimeError("Selected file is not child of the source or output")
-        configfile = pathlib.Path(ShrinkifyConfig.config_dir, 'tags.json')
-        if not configfile.is_file():
-            tagdata = {}
+        tagdata = json.loads(self.configfile.read_text('utf8'))
+        if str(target) in tagdata['songs']:
+            tagdata['songs'][str(target)] += [tag for tag in tags if tag not in tagdata['songs'][str(target)] and tag in tagdata['tags']]
         else:
-            tagdata = json.loads(configfile.read_text('utf8'))
-        if str(target) in tagdata:
-            tagdata[str(target)] += [tag for tag in tags if tag not in tagdata[str(target)]]
-        else:
-            tagdata[str(target)] = tags
+            tagdata['songs'][str(target)] = tags
         
-        configfile.write_text(json.dumps(tagdata))
+        self.configfile.write_text(json.dumps(tagdata))
     
     def remove_tags(self, target: typing.Union[pathlib.Path, int], tags: list) -> None:
         if target == enums.AUTOMATIC:
@@ -126,19 +123,18 @@ class Tagify(object):
                 target = target.relative_to(ShrinkifyConfig.source_folder).with_suffix('')
             except ValueError:
                 raise RuntimeError("Selected file is not child of the source or output")
-        configfile = pathlib.Path(ShrinkifyConfig.config_dir, 'tags.json')
         try:
-            tagdata = json.loads(configfile.read_text('utf8'))
+            tagdata = json.loads(self.configfile.read_text('utf8'))
         except FileNotFoundError:
             tagdata = {}
-        if str(target) in tagdata:
-            existing = set(tagdata[str(target)])
+        if str(target) in tagdata['songs']:
+            existing = set(tagdata['songs'][str(target)])
             remove = set(tags)
-            tagdata[str(target)] = list(existing.difference(remove))
+            tagdata['songs'][str(target)] = list(existing.difference(remove))
         else:
             raise RuntimeError("You can't remove tags from a song that isn't in the database")
         
-        configfile.write_text(json.dumps(tagdata))
+        self.configfile.write_text(json.dumps(tagdata))
     
     @staticmethod
     def _format_song_string(song: str) -> str:
@@ -148,6 +144,23 @@ class Tagify(object):
         listfile = pathlib.Path(ShrinkifyConfig.config_dir, "playlists.json")
         playlists = json.loads(listfile.read_text('utf8'))
         return list(playlists.keys())
+    
+    def get_playlist_content(self, playlist: str):
+        tagdata = self.get_all_songs()
+        conf = json.loads(self.listfile.read_text())[playlist]
+        for file in sorted(ShrinkifyConfig.output_folder.rglob("*")):
+            if not utils.is_valid(file, exclude_output=False, overwrite=True):
+                continue
+            try:
+                songtags = tagdata[str(file.relative_to(ShrinkifyConfig.output_folder).with_suffix(''))]
+            except KeyError:
+                songtags = []
+            songtags.extend(file.relative_to(ShrinkifyConfig.output_folder).parts)
+            
+            if conf['mode'].lower() == 'include' and set(songtags).intersection(conf['tags']):
+                yield file
+            elif conf['mode'].lower() == 'exclude' and not set(songtags).intersection(conf['tags']):
+                yield file
 
     def generate_playlist(self, mode: int, tags: typing.Iterable, output: pathlib.Path) -> None:
         configfile = pathlib.Path(ShrinkifyConfig.config_dir, 'tags.json')
