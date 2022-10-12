@@ -2,7 +2,7 @@
 from functools import cache
 import pathlib
 from ..config import ShrinkifyConfig
-from . import youtube_music_metadata
+from . import youtube_music_metadata_plus as youtube_music_metadata
 from . import youtube_metadata
 from . import file_metadata
 from . import shrink_utils

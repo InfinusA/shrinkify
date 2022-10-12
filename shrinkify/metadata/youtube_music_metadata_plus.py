@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import ytmusicapi
 import json
 import pathlib
@@ -13,57 +12,121 @@ from .. import utils
 import sys
 
 class YoutubeMusicMetadata(object):
-    '''Find metadata for a youtube music video on youtube music. 
-    Note that this does not do fuzzy text matching, but finds the exact corresponding metadata'''
+    '''
+    known broken songs:
+    X inabakumori - lagtrain (broken cache)
+    pinnochiop - reincarnation apple
+    pinnochiop - i just hate people
+    
+    '''
     def __init__(self):
         self.ytm = self.CacheYTMusic(shrinkify_cache=ShrinkifyConfig.cache, override=ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_enabled)
-    
-    def smart_title_fetch(self, song_info, source_id, original_id):
+
+    def fetch(self, source_id, no_meta=False, no_thumb=False, no_cache=False):
+        original_id = source_id
+        try:
+            if [o for o in ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_song if source_id  == o[0]]:
+                source_id = [o for o in ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_song if source_id in o][0][1]
+        except KeyError:
+            return False
+        self.ytm.set_cache_state(not no_cache)
+        yt_song = self.ytm.get_song(source_id)
+        if yt_song['playabilityStatus']['status'] in ('ERROR', 'LOGIN_REQUIRED'):
+            logging.error("ytm errored or requires login.")
+            return False
+        elif yt_song['playabilityStatus']['status'] in ('UNPLAYABLE',):
+            logging.error("ytm not playable. giving it a shot anyways")
+        
+        #get ytm entry by the music footer on the video
+        #if it doesn't exist, there is no exact (non-fuzzy and not guessing) way to get the ytm video from the yt video
+        #some of the techniques should be considered fuzzy, but they're accurate enough that they're basically exact
         data = requests.get(f"https://youtube.com/watch?v={original_id}").content.decode("utf8")
         real_data = json.loads(re.search("ytInitialData\s*=\s*(\{.*?)\s*;\s*</script>", data).group(1))
         description_meta = next(filter(lambda d: d['engagementPanelSectionListRenderer']['targetId']=='engagement-panel-structured-description', real_data['engagementPanels']))['engagementPanelSectionListRenderer']
         try:
             music_meta = next(filter(lambda d: 'videoDescriptionMusicSectionRenderer' in d, description_meta['content']['structuredDescriptionContentRenderer']['items']))
         except StopIteration:
+            logging.warning("using innacurate artist/title detection")
+            title = yt_song['videoDetails']['title']
+            artist = yt_song['videoDetails']['author']
+        else:
+            try:
+                title = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "SONG", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]["simpleText"]
+            except KeyError:
+                title = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "SONG", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]['runs'][0]['text']
+            try:
+                artist = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "ARTIST", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]['simpleText']
+            except KeyError:
+                artist = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "ARTIST", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]['runs'][0]['text']
+        
+        #search filtering (let ytm do the work)
+        ytm_song = ytm_album = None
+        for result in self.ytm.search(f"{title} - {artist}", filter="songs", limit=5):
+            #ideal
+            if result['videoId'] == source_id or result['videoId'] == original_id:
+                ytm_song = result
+                break
+            #artist name/id and song name
+            elif set((yt_song["videoDetails"]["author"], artist, yt_song['videoDetails']['channelId'])).intersection([a["name"]for a in result['artists']]+[a["id"]for a in result['artists']]) and result['title'] == yt_song['videoDetails']["title"]:
+                ytm_song = result
+                break
+            #artist name/id and song name and song's alternate intersect
+            elif set((yt_song["videoDetails"]["author"], artist, yt_song['videoDetails']['channelId'])).intersection([a["name"] for a in result['artists']]+[a["id"]for a in result['artists']]) and set(e['title'] for e in yt_song['microformat']['microformatDataRenderer']['linkAlternates'] if 'title' in e).intersection(set(e['title'] for e in self.ytm.get_song(result['videoId'])['microformat']['microformatDataRenderer']['linkAlternates'] if 'title' in e)):
+                ytm_song = result
+                break
+            #risky searching, relying on the fact that yt names are often longer than ytm names
+            elif set((yt_song["videoDetails"]["author"], artist, yt_song['videoDetails']['channelId'])).intersection([a["name"] for a in result['artists']]+[a["id"]for a in result['artists']]) and result['title'] in yt_song['videoDetails']["title"]:
+                ytm_song = result
+                logging.warning("using possibly risky song detector")
+                break
+            #riskier searching, this time also trying to guess the author
+            elif set((yt_song["videoDetails"]["author"], artist, self.ytm.get_artist(yt_song['videoDetails']['channelId'])['name'])).intersection(a["name"] for a in result['artists']) and result['title'] in yt_song['videoDetails']["title"]:
+                ytm_song = result
+                logging.warning("using possibly risky song detector")
+                break
+        else:
+            logging.warning("trying slow matching")
+            res = self.slow_match(yt_song, source_id, original_id)
+            if not res:
+                logging.warning("could not find ytm entry")
+                return False
+            ytm_song, ytm_album = res
+        
+        if not ytm_song:
+            logging.warning("could not find ytm entry")
             return False
-        title = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "SONG", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]["simpleText"]
-        try:
-            artist = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "ARTIST", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]['simpleText']
-        except KeyError:
-            artist = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "ARTIST", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]['runs'][0]['text']
         
-        return self.search_match_fetch({'videoDetails': {'title': title, 'author': artist}}, source_id, original_id, f"{title} - {artist}") or \
-                self.search_match_fetch({'videoDetails': {'title': song_info['videoDetails']['title'], 'author': artist}}, source_id, original_id, f"{title} - {artist}") #localization issues
-    
-    def search_match_fetch(self, song_info, source_id, original_id, query=None):
-        query = query if query else ShrinkifyConfig.Metadata.YoutubeMusicMetadata.search_query.format(title=song_info['videoDetails']['title'], artist=song_info['videoDetails']['author'])
-        search_results = self.ytm.search(query, filter="songs", limit=5)
-        selected_song = None
-        for result in search_results:
-            alts = self.ytm.get_song(result['videoId'])['microformat']['microformatDataRenderer']['linkAlternates']
-            if result['videoId'] in (source_id, original_id):
-                selected_song = result
-                break
-            elif any('title' in t and song_info['videoDetails']['title'] == t['title'] for t in alts):
-                selected_song = result
-                break
-            elif song_info['videoDetails']['author'] in [a['name'] for a in result['artists']] and result['title'] == song_info['videoDetails']['title']:
-                selected_song = result
-                break
+        if not ytm_album:
+            ytm_album = self.ytm.get_album(ytm_song['album']['id'])
         
-        # for method in utils.match_ytm_methods(ShrinkifyConfig.Metadata.YoutubeMusicMetadata.search_name_match):
-        #     for result in search_results:
-        #         if method(result, song_info):
-        #             selected_song = result
-        #             break
-            
-        if not selected_song:
-            return False
-        return selected_song, self.ytm.get_album(selected_song['album']['id'])
+        shrinkify_metadata = {}
+        if not no_meta:
+            shrinkify_metadata['title'] = ytm_song['title']
+            #TODO: handle multiple artists
+            try:
+                shrinkify_metadata['artist'] = ytm_album['artists'][0]['name']
+            except KeyError:
+                shrinkify_metadata['artist'] = ytm_song['artists'][0]['name']
+            shrinkify_metadata['album'] = ytm_album['title'] if ytm_album is not None else None
+            shrinkify_metadata['year'] = ytm_album['year']
+            shrinkify_metadata['date'] = ytm_album['year']
+        if not no_thumb:
+            if ShrinkifyConfig.cache:
+                cache_file = pathlib.Path(ShrinkifyConfig.cache, f'{source_id}.png')
+                if cache_file.is_file() and not no_cache:
+                    raw_thumbnail = cache_file.read_bytes()
+                else:
+                    raw_thumbnail = requests.get(max(ytm_album['thumbnails'], key=lambda x: x['height']+x['width'])['url']).content
+                    cache_file.write_bytes(raw_thumbnail)
+            else:
+                raw_thumbnail = requests.get(max(ytm_album['thumbnails'], key=lambda x: x['height']+x['width'])['url']).content
+
+            shrinkify_metadata['_thumbnail_image'] = data_to_thumbnail(raw_thumbnail)
         
-    
-    def artist_match_fetch(self, song_info, source_id, original_id):
+        return shrinkify_metadata
         
+    def slow_match(self, song_info, source_id, original_id):
+        #extremely precise but slow and low hit rate
         try:
             if [o for o in ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_artist if song_info['videoDetails']['channelId']  == o[0]]:
                 artist_id = [o for o in ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_artist if song_info['videoDetails']['channelId'] in o][0][1]
@@ -164,82 +227,6 @@ class YoutubeMusicMetadata(object):
         
         return target_song, target_album
     
-    def fetch(self, source_id, no_meta=False, no_thumb=False, no_cache=False):
-        """
-        source_id: a youtube video id
-        no_meta: don't get metadata, only the thumbnail
-        no_thumb: don't get thumbnail, only metadata
-          note: no_meta and no_thumb should generally not both be true
-        no_cache: temporarily disable cache. Useful to update the cache for a specific file
-        """
-        
-        #load override
-        original_id = source_id
-        try:
-            if [o for o in ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_song if source_id  == o[0]]:
-                original_id = source_id
-                source_id = [o for o in ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_song if source_id in o][0][1]
-        except KeyError:
-            return False
-        # if ShrinkifyConfig.cache and ShrinkifyConfig.Metadata.YoutubeMusicMetadata.override_enabled:
-        #     override_file = pathlib.Path(ShrinkifyConfig.cache, 'ytmusic_overrides.json')
-        #     with override_file.open('r') as of:
-        #         override = json.loads(of.read())
-        #         if source_id in override['song']:
-        #             source_id = override['song'][source_id]
-        
-        self.ytm.set_cache_state(not no_cache)
-        
-        if no_meta == True and no_thumb == True:
-            raise RuntimeWarning("Should not set both meta_only and thumb_only to True. This just returns nothing and is a waste of time and resources")
-        '''Given a song id, return either metadata or false if the id is invalid'''
-        song_info = self.ytm.get_song(source_id)
-        if song_info['playabilityStatus']['status'] in ('UNPLAYABLE', 'ERROR', 'LOGIN_REQUIRED'):
-            return False
-        
-        method = ShrinkifyConfig.Metadata.YoutubeMusicMetadata.method
-        if method == 0:
-            raw_metadata = self.smart_title_fetch(song_info, source_id, original_id) or self.search_match_fetch(song_info, source_id, original_id) or self.artist_match_fetch(song_info, source_id, original_id)
-            print(raw_metadata)
-        elif method == 1:
-            raw_metadata = self.artist_match_fetch(song_info, source_id, original_id)
-        elif method == 2:
-            raw_metadata = self.search_match_fetch(song_info, source_id, original_id) or self.artist_match_fetch(song_info, source_id, original_id)
-        else:
-            raise RuntimeError(f"Unknown YTMusic metadata method: {ShrinkifyConfig.Metadata.YoutubeMusicMetadata.method}")
-        
-        if not raw_metadata:
-            return False
-        
-        target_song, target_album = raw_metadata
-        
-        shrinkify_metadata = {}
-        if not no_meta:
-            shrinkify_metadata['title'] = target_song['title']
-            #TODO: handle multiple artists
-            try:
-                shrinkify_metadata['artist'] = target_album['artists'][0]['name']
-            except KeyError:
-                shrinkify_metadata['artist'] = target_song['artists'][0]['name']
-            shrinkify_metadata['album'] = target_album['title'] if target_album is not None else None
-            shrinkify_metadata['year'] = target_album['year']
-            shrinkify_metadata['date'] = target_album['year']
-        if not no_thumb:
-            if ShrinkifyConfig.cache:
-                cache_file = pathlib.Path(ShrinkifyConfig.cache, f'{source_id}.png')
-                if cache_file.is_file() and not no_cache:
-                    raw_thumbnail = cache_file.read_bytes()
-                else:
-                    raw_thumbnail = requests.get(max(target_album['thumbnails'], key=lambda x: x['height']+x['width'])['url']).content
-                    cache_file.write_bytes(raw_thumbnail)
-            else:
-                raw_thumbnail = requests.get(max(target_album['thumbnails'], key=lambda x: x['height']+x['width'])['url']).content
-
-            shrinkify_metadata['_thumbnail_image'] = data_to_thumbnail(raw_thumbnail)
-        
-        return shrinkify_metadata
-
-
     class CacheYTMusic(ytmusicapi.YTMusic):
         '''
         wrapper for YTMusic that automatically handles caching and overrides

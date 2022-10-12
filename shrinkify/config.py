@@ -119,10 +119,11 @@ class _ShrinkifyConfig(NestedNamespace):
                 self.use_channel_image = False
         class _YoutubeMusicMetadata(NestedNamespace):
             def __init__(self):
-                self.method = 1
+                self.method = 0
                 self.search_query = "{title} - {artist}"
                 self.enabled = True
                 self.name_match = True
+                self.search_name_artist_match = True
                 self.search_name_match = False #YouTube has selection bias (and name conflicts, eg "pneumonoultramicroscopicsilicovolcanoconiosis" or "carbon" (both supposed to be by Dasu))
                 self.similarity_match = False #costly but marginally better results than substring match in some titles
                 self.similarity_threshold = 0.75
