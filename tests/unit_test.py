@@ -49,6 +49,12 @@ class MetadataTester(unittest.TestCase):
         cv = self.yt.fetch('NIv_yYKl9tQ')
         self.assertTrue(cv)
     
+    def test_ytm_cases(self):
+        for line in open("tests/cases.txt").readlines():
+            if line.startswith("#"): continue
+            if not self.ytm.fetch(line.strip()):
+                self.fail(f"url returned false: {line.strip()}")
+    
     # def test_file_valid(self):
     #     cv = self.fm.fetch('')
     #     self.assertTrue(cv)

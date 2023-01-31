@@ -37,7 +37,7 @@ class YoutubeMetadata(object):
         shrinkify_metadata = {}
         if not no_meta:
            shrinkify_metadata['title'] = snippet['title']
-           shrinkify_metadata['album'] = snippet['title']
+           shrinkify_metadata['album'] = f"{snippet['channelTitle']} on YouTube"
            shrinkify_metadata['artist'] = snippet['channelTitle']
            shrinkify_metadata['year'] = snippet['publishedAt'][:4]
            shrinkify_metadata['date'] = snippet['publishedAt'][:4]

@@ -51,46 +51,74 @@ class YoutubeMusicMetadata(object):
             artist = yt_song['videoDetails']['author']
         else:
             try:
-                title = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "SONG", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]["simpleText"]
-            except KeyError:
-                title = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "SONG", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]['runs'][0]['text']
-            try:
-                artist = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "ARTIST", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]['simpleText']
-            except KeyError:
-                artist = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "ARTIST", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]['runs'][0]['text']
+                try:
+                    title = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "SONG", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]["simpleText"]
+                except (KeyError, StopIteration):
+                    title = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "SONG", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]['runs'][0]['text']
+                try:
+                    artist = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "ARTIST", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]['simpleText']
+                except (KeyError, StopIteration):
+                    artist = next(filter(lambda d: d['infoRowRenderer']['title']['simpleText'] == "ARTIST", music_meta['videoDescriptionMusicSectionRenderer']['carouselLockups'][0]['carouselLockupRenderer']['infoRows']))["infoRowRenderer"]["defaultMetadata"]['runs'][0]['text']
+            except (KeyError, StopIteration):
+                logging.warning("using innacurate artist/title detection")
+                title = yt_song['videoDetails']['title']
+                artist = yt_song['videoDetails']['author']
         
         #search filtering (let ytm do the work)
         ytm_song = ytm_album = None
-        for result in self.ytm.search(f"{title} - {artist}", filter="songs", limit=5):
+        reslist = self.ytm.search(f"{title} - {artist}", filter="songs", limit=5)
+        
+        for result in reslist:
             #ideal
             if result['videoId'] == source_id or result['videoId'] == original_id:
                 ytm_song = result
                 break
+        for result in reslist:
+            if ytm_song: break
             #artist name/id and song name
-            elif set((yt_song["videoDetails"]["author"], artist, yt_song['videoDetails']['channelId'])).intersection([a["name"]for a in result['artists']]+[a["id"]for a in result['artists']]) and result['title'] == yt_song['videoDetails']["title"]:
+            if set((yt_song["videoDetails"]["author"], artist, yt_song['videoDetails']['channelId'])).intersection([a["name"]for a in result['artists']]+[a["id"]for a in result['artists']]) and result['title'] == yt_song['videoDetails']["title"]:
                 ytm_song = result
                 break
+        for result in reslist:
+            if ytm_song: break
             #artist name/id and song name and song's alternate intersect
-            elif set((yt_song["videoDetails"]["author"], artist, yt_song['videoDetails']['channelId'])).intersection([a["name"] for a in result['artists']]+[a["id"]for a in result['artists']]) and set(e['title'] for e in yt_song['microformat']['microformatDataRenderer']['linkAlternates'] if 'title' in e).intersection(set(e['title'] for e in self.ytm.get_song(result['videoId'])['microformat']['microformatDataRenderer']['linkAlternates'] if 'title' in e)):
+            if set((yt_song["videoDetails"]["author"], artist, yt_song['videoDetails']['channelId'])).intersection([a["name"] for a in result['artists']]+[a["id"]for a in result['artists']]) and set(e['title'] for e in yt_song['microformat']['microformatDataRenderer']['linkAlternates'] if 'title' in e).intersection(set(e['title'] for e in self.ytm.get_song(result['videoId'])['microformat']['microformatDataRenderer']['linkAlternates'] if 'title' in e)):
                 ytm_song = result
                 break
-            #risky searching, relying on the fact that yt names are often longer than ytm names
-            elif set((yt_song["videoDetails"]["author"], artist, yt_song['videoDetails']['channelId'])).intersection([a["name"] for a in result['artists']]+[a["id"]for a in result['artists']]) and result['title'] in yt_song['videoDetails']["title"]:
-                ytm_song = result
-                logging.warning("using possibly risky song detector")
-                break
-            #riskier searching, this time also trying to guess the author
-            elif set((yt_song["videoDetails"]["author"], artist, self.ytm.get_artist(yt_song['videoDetails']['channelId'])['name'])).intersection(a["name"] for a in result['artists']) and result['title'] in yt_song['videoDetails']["title"]:
-                ytm_song = result
-                logging.warning("using possibly risky song detector")
-                break
+        
+        #slow matching
+        res = self.slow_match(yt_song, source_id, original_id)
+        if not res:
+            logging.warning("slow matching failed")
         else:
-            logging.warning("trying slow matching")
-            res = self.slow_match(yt_song, source_id, original_id)
-            if not res:
-                logging.warning("could not find ytm entry")
-                return False
             ytm_song, ytm_album = res
+        
+        if ShrinkifyConfig.Metadata.YoutubeMusicMetadata.risky_methods:
+            for result in reslist:
+                if ytm_song: break
+                #risky searching, relying on the fact that yt names are often longer than ytm names
+                if 'cover' not in yt_song['videoDetails']["title"].lower() and set((yt_song["videoDetails"]["author"], artist, yt_song['videoDetails']['channelId'])).intersection([a["name"] for a in result['artists']]+[a["id"]for a in result['artists']]) and result['title'] in yt_song['videoDetails']["title"]:
+                    ytm_song = result
+                    logging.warning("using possibly risky song detector")
+                    break
+            for result in reslist:
+                if ytm_song: break
+                #riskier searching, this time also trying to guess the author
+                try:
+                    if 'cover' not in yt_song['videoDetails']["title"].lower() and set((yt_song["videoDetails"]["author"], artist, self.ytm.get_artist(yt_song['videoDetails']['channelId'])['name'])).intersection(a["name"] for a in result['artists']) and result['title'] in yt_song['videoDetails']["title"]:
+                        ytm_song = result
+                        logging.warning("using possibly risky song detector")
+                        break
+                except KeyError:
+                    continue
+            
+        #if ytm_song is None:
+        #    logging.warning("trying slow matching")
+        #    res = self.slow_match(yt_song, source_id, original_id)
+        #    if not res:
+        #        logging.warning("could not find ytm entry")
+        #        return False
+        #    ytm_song, ytm_album = res
         
         if not ytm_song:
             logging.warning("could not find ytm entry")
