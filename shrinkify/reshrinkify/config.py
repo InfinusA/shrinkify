@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import pathlib
 import os
 class ConfigGroup:
     def __setattr__(self, name, value):
@@ -10,17 +11,37 @@ class ConfigGroup:
         else:
             self.__dict__[name] = value
 
-class Config(ConfigGroup):
-    @dataclass
-    class GeneralConfig(ConfigGroup):
-        root: os.PathLike | str
-        output: os.PathLike | str
-        cache_dir: os.PathLike | str
-        cache_file: os.PathLike | str #sqlite db
-        input_types: tuple[str]
-        exclude_filter: tuple[str]
-        
-    @dataclass
-    class ConvertConfig(ConfigGroup):
-        output_type: str
+@dataclass
+class General(ConfigGroup):
+    root: os.PathLike | str = pathlib.Path("~/Music").expanduser()
+    output: os.PathLike | str = pathlib.Path("~/Music/compressed").expanduser()
+    cache_dir: os.PathLike | str = pathlib.Path("~/.cache/shrinkify").expanduser()
+    cache_file: os.PathLike | str = pathlib.Path("~/.cache/shrinkify/cache.sqlite").expanduser()
+    input_types: tuple[str, ...] = ('.mp3', '.mp4', '.mkv', '.webm', '.m4a', '.aac', '.wav', '.ogg', '.opus', '.flac')
+    output_type: str = '.m4a'
+    exclude_filter: tuple[str, ...] = ('compressed',)
+    
+@dataclass
+class Conversion(ConfigGroup):
+    throttle: int = 0
+    thumbnail_format: str = '.png'
+    pre_args: list[str] = field(default_factory=lambda: ['ffmpeg', '-y'])
+    mid_args: list[str] = field(default_factory=lambda: ['-map', '0:a:0', '-map', '1', '-c:v', 'copy', '-disposition:v:0', 'attached_pic'])
 
+@dataclass
+class YoutubeMusicMetadata(ConfigGroup):
+    filename_regex: tuple[str, ...] = (r"-([a-zA-Z0-9\-_]{11})\.", r"\[([a-zA-Z0-9\-_]{11})\].")
+
+@dataclass
+class Metadata(ConfigGroup):
+    youtubemusic: YoutubeMusicMetadata = YoutubeMusicMetadata()
+
+@dataclass
+class Config(ConfigGroup):
+    general: General = General()
+    conversion: Conversion = Conversion()
+    metadata: Metadata = Metadata()
+
+def generate_default():
+    conf = Config()
+    return conf
