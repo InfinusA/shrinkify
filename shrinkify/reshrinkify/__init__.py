@@ -18,7 +18,7 @@ class Shrinkify(object):
         self.root = pathlib.Path(config.general.root).resolve()
         self.output = pathlib.Path(config.general.output).resolve()
         self.config = config
-        #self.metaprocessor = metadata.MetadataProcessor()
+        self.metaprocessor = metadata.MetadataParser(self.config)
     
     def get_output_file(self, file: os.PathLike | str) -> pathlib.Path:
         pfile = pathlib.Path(file)
@@ -59,8 +59,7 @@ class Shrinkify(object):
         output = pathlib.Path(file.parent, "shrinkify_temp").with_suffix(self.config.general.output_type)
         
         logging.info("parsing metadata")
-        from PIL import Image
-        meta = {"_thumbnail_image": Image.open("/home/infinusa/sucrose.png")}#self.metaprocessor.parse(file)
+        meta = self.metaprocessor.parse(file)
         logging.debug(f"{file.name}: metadata: {meta}")
         convert_cmd = []
         convert_cmd.extend(copy.copy(self.config.conversion.pre_args))

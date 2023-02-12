@@ -29,12 +29,26 @@ class Conversion(ConfigGroup):
     mid_args: list[str] = field(default_factory=lambda: ['-map', '0:a:0', '-map', '1', '-c:v', 'copy', '-disposition:v:0', 'attached_pic'])
 
 @dataclass
+class FileMetadata(ConfigGroup):
+    ffprobe_command: tuple[str, ...] = ('ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams')
+    ffthumb_pre_command: tuple[str, ...] = ('ffmpeg', '-i')
+    ffthumb_post_command: tuple[str, ...] = ('-an', '-map', '0:v:0', '-vframes', '1', '-c:v', 'png', '-f', 'image2pipe', '-')
+    thumbnail_types: tuple[str, ...] = ('jpg', 'jpeg', 'png')
+
+@dataclass
+class YoutubeMetadata(ConfigGroup):
+    filename_regex: tuple[str, ...] = (r"-([a-zA-Z0-9\-_]{11})\.", r"\[([a-zA-Z0-9\-_]{11})\].")
+    api_key: str | None = None
+
+@dataclass
 class YoutubeMusicMetadata(ConfigGroup):
     filename_regex: tuple[str, ...] = (r"-([a-zA-Z0-9\-_]{11})\.", r"\[([a-zA-Z0-9\-_]{11})\].")
 
 @dataclass
 class Metadata(ConfigGroup):
     youtubemusic: YoutubeMusicMetadata = YoutubeMusicMetadata()
+    youtube: YoutubeMetadata = YoutubeMetadata()
+    file: FileMetadata = FileMetadata()
 
 @dataclass
 class Config(ConfigGroup):

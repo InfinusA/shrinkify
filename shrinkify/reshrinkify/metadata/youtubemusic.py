@@ -1,9 +1,9 @@
 import pathlib
-from . import MetadataHandler
+#from . import MetadataHandler
 import re
 from .. import config
 
-class YoutubeMusicMetadata(MetadataHandler):
+class YoutubeMusicMetadata(object):#MetadataHandler):
     def __init__(self, conf: config.Config) -> None:
         self.conf = conf
     
