@@ -1,118 +1,83 @@
-#!/usr/bin/python
 import argparse
-import logging
 import pathlib
-import enum
+import sys
+import logging
+from . import Shrinkify
+from . import config
 
-from . import Shrinkify, playlist, tag
-from .config import ShrinkifyConfig
-from .tag import ui as Shiggy #if u know u know
+def main():
+    logging.basicConfig(level=0)
+    conf = config.generate_default()
+    cle = CommandLineExec(conf)
+    cle.determine_parse(sys.argv)
 
-#TODO: normalize config names
+def shrink():
+    logging.basicConfig(level=20)
+    conf = config.generate_default()
+    cle = CommandLineExec(conf)
+    cle.parse_shrink(sys.argv)
 
-def full_entrypoint():
-    ShrinkifyExec(ShrinkifyExec.enums.MAIN).parse()
-def shrink_entrypoint():
-    ShrinkifyExec(ShrinkifyExec.enums.SHRINK).parse()
-def tag_entrypoint():
-    ShrinkifyExec(ShrinkifyExec.enums.TAG).parse()
-
-class ShrinkifyExec(object):
-    class enums(enum.Enum):
-        MAIN = "Shrinkify.py"
-        SHRINK = "Shrinkify"
-        TAG = "Tagify"
-    def __init__(self, mode) -> None:
-        ShrinkifyConfig.load_yaml()
-        self.mode = mode
-        self.parser = argparse.ArgumentParser(mode)
-        self.parser = self.global_opts(self.parser)
-        if mode == self.enums.MAIN:
-            subparsers = self.parser.add_subparsers(required=True)
-            
-            sub_shrink = subparsers.add_parser('shrink', aliases=['s'])
-            sub_shrink.set_defaults(cmd=self.enums.SHRINK)
-            self.shrink_opts(sub_shrink)
-            
-            sub_tag = subparsers.add_parser('tagify', aliases=['t'])
-            sub_tag.set_defaults(cmd=self.enums.TAG)
-            self.tag_opts(sub_tag)
-            
-        elif mode == self.enums.SHRINK:
-            self.parser = self.shrink_opts(self.parser)
-            
-        elif mode == self.enums.TAG:
-            self.parser = self.tag_opts(self.parser)
-            
+class RecursiveNamespace(argparse.Namespace):
+    def __setattr__(self, name, value):
+        if '.' in name:
+            group,name = name.split('.',1)
+            ns = getattr(self, group)
+            setattr(ns, name, value)
+            self.__dict__[group] = ns
         else:
-            raise RuntimeError(f"Unknown Mode: {mode}")
+            self.__dict__[name] = value
+
+class CommandLineExec(object):
+    def __init__(self, conf: config.Config) -> None:
+        self.conf = conf
+        
+    def add_general_opts(self, parser: argparse.ArgumentParser):
+        parser.add_argument("-s", "-r", "--root", "--source", dest="c.general.root", type=pathlib.Path, default=self.conf.general.root)
+        parser.add_argument("-o", "-d", "--output", "--dest", dest="c.general.output", type=pathlib.Path, default=self.conf.general.output)
+        parser.add_argument("--cachedir", dest="c.general.cache_dir", type=pathlib.Path, default=self.conf.general.cache_dir)
+        parser.add_argument("--cachefile", dest="c.general.cache_file", type=pathlib.Path, default=self.conf.general.cache_file)
+        parser.add_argument("-i", "--input-types", dest="c.general.input_types", default=self.conf.general.input_types, nargs='*', type=tuple)
+        parser.add_argument("-t", "--output-type", dest="c.general.output_type", default=self.conf.general.output_type, type=str)
+        parser.add_argument("-e", "--exclude", dest="c.general.exclude_filter", default=self.conf.general.exclude_filter, nargs='*', type=tuple)
+        return parser
     
-    def parse(self):
-        self.parser.parse_args(namespace=ShrinkifyConfig)
-        logging.basicConfig(level=50-(ShrinkifyConfig.verbosity*10))
-        logging.debug(dir(ShrinkifyConfig))
-        if self.mode == self.enums.MAIN:
-            self.mode = ShrinkifyConfig.cmd
-        #purposeful if here
-        if self.mode == self.enums.SHRINK:
-            shrinkify = Shrinkify()
-            if ShrinkifyConfig.Runtime.single_file:
-                shrinkify.single_convert(ShrinkifyConfig.Runtime.single_file)
-            else:
-                shrinkify.recursive_convert()
-            if ShrinkifyConfig.Shrinkify.delete_nonexisting:
-                shrinkify.recursive_delete()
-            
-            tag.Tagify().generate_all()
-                
-        elif self.mode == self.enums.TAG:
-            tagify = tag.Tagify()
-            if ShrinkifyConfig.Runtime.mode == 'a':
-                tagify.add_tags(ShrinkifyConfig.Runtime.target, ShrinkifyConfig.Runtime.tags)
-            elif ShrinkifyConfig.Runtime.mode == 'r':
-                tagify.remove_tags(ShrinkifyConfig.Runtime.target, ShrinkifyConfig.Runtime.tags)
-            elif ShrinkifyConfig.Runtime.mode == 'l':
-                tagify.list_tags(ShrinkifyConfig.Runtime.target)
-            elif ShrinkifyConfig.Runtime.mode == 'b':
-                tagify.batch_tag()
-            elif ShrinkifyConfig.Runtime.mode == 'g':
-                pass #just generate
-            elif ShrinkifyConfig.Runtime.mode == 'u':
-                Shiggy.exec()
-            tagify.generate_all()
+    def add_convert_opts(self, parser: argparse.ArgumentParser):
+        parser.add_argument("-w", "--throttle", dest="c.conversion.throttle", default=self.conf.conversion.throttle, type=int)
+        parser.add_argument("--thumbnail-format", dest="c.conversion.thumbnail_format", default=self.conf.conversion.thumbnail_format, type=str)
+        parser.add_argument("--ffmpeg-pre-args", dest="c.conversion.pre_args", default=self.conf.conversion.pre_args, nargs='*', type=list, help="Do not use unless you know what you are doing")
+        parser.add_argument("--ffmpeg-mid-args", dest="c.conversion.mid_args", default=self.conf.conversion.mid_args, nargs='*', type=list, help="Do not use unless you know what you are doing")
+        self.add_metadata_opts(parser)
+        return parser
+
+    def add_metadata_opts(self, parser: argparse.ArgumentParser):
+        parser.add_argument("-y", "--youtube-api-key", dest="c.metadata.youtube.api_key", default=self.conf.metadata.youtube.api_key, type=str)
+        return parser
+
+    def parse_shrink(self, argv: list[str]):
+        parser = argparse.ArgumentParser()
+        self.add_general_opts(parser)
+        self.add_convert_opts(parser)
+        parser.add_argument('--in-place', dest='in_place', default=False, action='store_true')
+        parser.add_argument('--continue-from', dest='continue_from', type=pathlib.Path, default=None)
+        parser.add_argument('files', nargs='*', help="Optional: Specific files to convert. If not specified, converts all convertable files in root.")
+
+        parse_namespace = RecursiveNamespace(c=self.conf)
+        parse_namespace = parser.parse_args(argv, namespace=parse_namespace)
+        logging.debug(parse_namespace)
+        shrink = Shrinkify(self.conf)
+        if len(parse_namespace.files) == 0:
+            shrink.shrink_directory(self.conf.general.root, update=parse_namespace.in_place, continue_from=parse_namespace.continue_from)
         else:
-            raise RuntimeError(f"Unknown Mode: {self.mode}")
-        
-    
-    def global_opts(self, parser):
-        parser.add_argument('-s', '--source-folder', dest='source_folder', type=lambda p: pathlib.Path(p).expanduser(), default=ShrinkifyConfig.source_folder)
-        parser.add_argument('-o', '--output-folder', dest='output_folder', type=lambda p: pathlib.Path(p).expanduser(), default=ShrinkifyConfig.output_folder)
-        parser.add_argument('-v', '--verbose',       dest='verbosity', action='count', default=0)
-        parser.add_argument('--exclude',    dest='exclude_dir', nargs='+', help='list of directories to exclude', default=ShrinkifyConfig.exclude)
-        parser.add_argument('--debug',      dest='debug', action='store_true')
-        parser.add_argument('--cache',      dest='cache', type=lambda p: pathlib.Path(p).expanduser(), default=str(ShrinkifyConfig.cache))
-        return parser
-    
-    def shrink_opts(self, parser):
-        parser.add_argument('--simulate',       dest='simulate', action="store_true")
-        parser.add_argument('-f', '--overwrite-existing', '--force', dest='Shrinkify.flag_overwrite', action='store_true', help="Overwrite existing files")
-        parser.add_argument('--update-metadata',dest='Shrinkify.update_metadata', action='store_true', help='Update metadata without reconverting')
-        parser.add_argument('-d', '--delete',   dest='Shrinkify.delete_nonexisting', action='store_true', help="Delete files not part of parent directory. Disabled by default")
-        parser.add_argument('--filetypes',      dest='filetypes', nargs='+', help='list of filetypes to convert', default=ShrinkifyConfig.filetypes)
-        parser.add_argument('-t', '--throttle', dest='Shrinkify.throttle_length', type=lambda x: int(x) if x.isdecimal() and (int(x) >= 0) else parser.error("Minimum throttle time is 0"), default=0)
-        parser.add_argument('--continue-from',  dest='Runtime.continue_from', help="Continue from the file with this filename", type=lambda p: pathlib.Path(p).expanduser())
-        parser.add_argument('--single-file',    dest='Runtime.single_file', type=lambda p: pathlib.Path(p).expanduser(), help="Only convert a single file.")
-        
-        metadata_args = parser.add_argument_group('Metadata')
-        metadata_args.add_argument('--youtube-api-key', dest='Metadata.YoutubeMetadata.api_key', default=ShrinkifyConfig.Metadata.YoutubeMetadata.api_key)
-        metadata_args.add_argument('--thumbnail-mode', type=int, dest='Metadata.ThumbnailGenerator.generator_mode', default=ShrinkifyConfig.Metadata.ThumbnailGenerator.generator_mode)
-        return parser
-        
-    def tag_opts(self, parser):
-        #TODO: seperate parsers
-        parser.add_argument('-m', '--mode', dest='Runtime.mode', default='a', choices=['a', 'r', 'l', 'b', 'g', 'u'])
-        parser.add_argument('Runtime.target', type=lambda p: pathlib.Path(p).expanduser() if p != "CURRENT" else tag.enums.AUTOMATIC)
-        parser.add_argument('Runtime.tags', nargs='*', default=[], metavar="[tags]")
-        parser.add_argument('--continue-from',  dest='Runtime.continue_from', help="Continue from the file with this filename", type=lambda p: pathlib.Path(p).expanduser())
-        return parser
-    
+            for file in parse_namespace.files:
+                file = pathlib.Path(file).expanduser().resolve()
+                if file.is_dir():
+                    shrink.shrink_directory(file, update=parse_namespace.in_place, continue_from=parse_namespace.continue_from)
+                elif file.is_file():
+                    shrink.shrink_file(file, update=parse_namespace.in_place)
+
+    def determine_parse(self, argv: list[str]):
+        logging.debug(argv)
+        if len(argv) < 2 or argv[1] in ("shrink", "s"):
+            self.parse_shrink(argv[2:])
+        else:
+            raise RuntimeError(f"Unknown subcommand: {argv[1]}")
