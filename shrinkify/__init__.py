@@ -9,6 +9,17 @@ import time
 from . import metadata
 from . import config #FIXME
 
+try:
+    import mutagen
+    import mutagen.easymp4
+    MUTAGEN_ENABLED = True
+except ImportError:
+    MUTAGEN_ENABLED = False
+    
+MUTAGEN_KEY_CONVERSION = {
+    'year': '\xa9day'
+}
+
 class Shrinkify(object):
     """
     The class used to handle the conversion of files
@@ -67,10 +78,13 @@ class Shrinkify(object):
         convert_cmd.extend(copy.copy(self.config.conversion.mid_args))
         if update:
             convert_cmd.extend(['-a:c', 'copy'])
-        for k, v in meta.items():
-            if k.startswith('_'):
-                continue
-            convert_cmd.extend(['-metadata', f"{k}={v}"])
+        if not MUTAGEN_ENABLED:
+            for k, v in meta.items():
+                if k.startswith('_'):
+                    continue
+                if isinstance(v, list): #multi-value tags
+                    v = ", ".join(v)
+                convert_cmd.extend(['-metadata', f"{k}={v}"])
         convert_cmd.append(str(output.expanduser().resolve()))
         logging.debug(f"{file.name}: command list: {convert_cmd}")
         logging.info(f"{file.name}: beginning conversion")
@@ -83,6 +97,20 @@ class Shrinkify(object):
 
         ffmpeg_stdout, ffmpeg_stderr = ffmpeg_proc.communicate(ffmpeg_stdin.read())
         ffmpeg_proc.wait()
+        if MUTAGEN_ENABLED:
+            logging.debug("starting mutagen metadata adder thing")
+            if self.config.general.output_type == '.m4a':
+                muta_file = mutagen.easymp4.EasyMP4(output.expanduser().resolve())
+                for k, v in MUTAGEN_KEY_CONVERSION.items():
+                    muta_file.RegisterTextKey(k, v)
+                for k, v in meta.items():
+                    if k[0] == "_":
+                        continue
+                    muta_file[k] = v
+                muta_file.save()
+            else:
+                raise RuntimeError(f"Unsupported output format for mutagen metadata: {self.config.general.output_type}")
+        
         logging.info(f"{file.name}: finished conversion")
 
         real_output = self.get_output_file(file).resolve()

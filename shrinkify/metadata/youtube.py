@@ -13,19 +13,11 @@ class VideoNotFoundException(Exception):
     pass
 
 class YoutubeMetadata(object):
-    
-    SCHEMA: str = """
-    CREATE TABLE IF NOT EXISTS youtubeMetadata (
-        video_id STRING PRIMARY KEY NOT NULL,
-        raw_data STRING NOT NULL
-    );
-    """
-    
     def __init__(self, conf: config.Config, cache: caching.CacheConnector | None = None) -> None:
         self.conf = conf
         self.cache = cache.create_simple("youtubeMetadata") if cache is not None else None
         if self.cache:
-            self.cache.load_schema(YoutubeMetadata.SCHEMA)
+            self.cache.load_generic_schema("video_id", "raw_data")
         self.session = requests.Session()
         if self.conf.metadata.youtube.api_key is None:
             raise RuntimeError("Youtube API key not specified in config")
@@ -75,6 +67,16 @@ class YoutubeMetadata(object):
                 pathlib.Path(self.conf.general.cache_dir, video_id).with_suffix(".jpg").write_bytes(data)
             return data
     
+    def get_channel_icon(self, channel_id: str):
+        if tuple(pathlib.Path(self.conf.general.cache_dir).glob(f"{channel_id}.*")):
+            return next(pathlib.Path(self.conf.general.cache_dir).glob(f"{channel_id}.*")).read_bytes()
+        else:
+            icon_json = json.loads(self.session.get(f"https://www.googleapis.com/youtube/v3/channels", params={'part': 'snippet', 'id': channel_id}).content)
+            data = requests.get(max(icon_json['items'][0]['snippet']['thumbnails'].values(), key=lambda o: o['height']+o['width'])['url']).content
+            if pathlib.Path(self.conf.general.cache_dir).is_dir():
+                pathlib.Path(self.conf.general.cache_dir, channel_id).with_suffix(".jpg").write_bytes(data)
+            return data
+    
     def fetch(self, file: pathlib.Path):
         video_id = self.get_id(file.name)
         if not video_id:
@@ -93,7 +95,7 @@ class YoutubeMetadata(object):
         output['date'] = video_date.strftime(r"%F-%m-%d")
         output['comment'] = snippet['description']
         idat = io.BytesIO()
-        idat.write(self.get_thumbnail(video_id))
+        idat.write(self.get_channel_icon(snippet['channelId']))
         idat.seek(0)
         output['_thumbnail_image'] = Image.open(idat)
         

@@ -12,6 +12,15 @@ class SimpleConnection(object):
     def load_schema(self, schema: str):
         self.cursor.executescript(schema)
         self.cursor.connection.commit()
+        
+    def load_generic_schema(self, keyName: str, dataName: str):
+        self.cursor.executescript(f"""
+            CREATE TABLE IF NOT EXISTS {self.table} (
+                {keyName} STRING PRIMARY KEY NOT NULL,
+                {dataName} STRING NOT NULL
+            );""")
+        self.cursor.connection.commit()
+        
             
     def insert(self, data: list[typing.Any] | dict[str, typing.Any]) -> None:
         if isinstance(data, list):
