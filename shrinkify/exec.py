@@ -12,10 +12,10 @@ def main():
     cle.determine_parse(sys.argv)
 
 def shrink():
-    logging.basicConfig(level=20)
+    logging.basicConfig(level=0)
     conf = config.generate_default()
     cle = CommandLineExec(conf)
-    cle.parse_shrink(sys.argv)
+    cle.parse_shrink(sys.argv[1:])
 
 class RecursiveNamespace(argparse.Namespace):
     def __setattr__(self, name, value):
@@ -36,16 +36,16 @@ class CommandLineExec(object):
         parser.add_argument("-o", "-d", "--output", "--dest", dest="c.general.output", type=pathlib.Path, default=self.conf.general.output)
         parser.add_argument("--cachedir", dest="c.general.cache_dir", type=pathlib.Path, default=self.conf.general.cache_dir)
         parser.add_argument("--cachefile", dest="c.general.cache_file", type=pathlib.Path, default=self.conf.general.cache_file)
-        parser.add_argument("-i", "--input-types", dest="c.general.input_types", default=self.conf.general.input_types, nargs='*', type=tuple)
+        parser.add_argument("-i", "--input-types", dest="c.general.input_types", default=self.conf.general.input_types, nargs='*', type=str)
         parser.add_argument("-t", "--output-type", dest="c.general.output_type", default=self.conf.general.output_type, type=str)
-        parser.add_argument("-e", "--exclude", dest="c.general.exclude_filter", default=self.conf.general.exclude_filter, nargs='*', type=tuple)
+        parser.add_argument("-e", "--exclude", dest="c.general.exclude_filter", default=self.conf.general.exclude_filter, nargs='*', type=str)
         return parser
     
     def add_convert_opts(self, parser: argparse.ArgumentParser):
         parser.add_argument("-w", "--throttle", dest="c.conversion.throttle", default=self.conf.conversion.throttle, type=int)
         parser.add_argument("--thumbnail-format", dest="c.conversion.thumbnail_format", default=self.conf.conversion.thumbnail_format, type=str)
-        parser.add_argument("--ffmpeg-pre-args", dest="c.conversion.pre_args", default=self.conf.conversion.pre_args, nargs='*', type=list, help="Do not use unless you know what you are doing")
-        parser.add_argument("--ffmpeg-mid-args", dest="c.conversion.mid_args", default=self.conf.conversion.mid_args, nargs='*', type=list, help="Do not use unless you know what you are doing")
+        parser.add_argument("--ffmpeg-pre-args", dest="c.conversion.pre_args", default=self.conf.conversion.pre_args, nargs='*', type=str, help="Do not use unless you know what you are doing")
+        parser.add_argument("--ffmpeg-mid-args", dest="c.conversion.mid_args", default=self.conf.conversion.mid_args, nargs='*', type=str, help="Do not use unless you know what you are doing")
         self.add_metadata_opts(parser)
         return parser
 

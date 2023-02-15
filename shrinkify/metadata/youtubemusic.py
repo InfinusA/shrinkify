@@ -46,11 +46,11 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
         video_id = self.get_id(file.name)
         if not video_id:
             return False
-        album_id = None
+        album_id = identifier_info = None
         for res_func in (self.deadsimple_identifier,):
             res = res_func(video_id)
             if res:
-                album_id = res
+                album_id, identifier_info = res
                 break
         else:
             return False
@@ -61,7 +61,15 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
                 song = track
                 break
         else:
-            raise RuntimeError("This error should not occur")
+            logging.warning("Using name-based rematching")
+            song_title = identifier_info['title']
+            for track in album['tracks']:
+                if track['title'] == song_title:
+                    song = track
+                    break
+            else:
+                logging.critical(album)
+                raise RuntimeError("Could not find song in identified album (see debug log)")
         output = {}
         output['title'] = song['title']
         output['artist'] = [a['name'] for a in song['artists']]
@@ -77,7 +85,7 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
         output['_thumbnail_image'] = Image.open(io.BytesIO(thumb_data))
         return output
     
-    def deadsimple_identifier(self, video_id: str) -> str | None:
+    def deadsimple_identifier(self, video_id: str) -> tuple[str, dict] | None:
         song_info = self.get_song(video_id)
         if song_info['playabilityStatus']['status'] in ('UNPLAYABLE',):
             return None
@@ -114,7 +122,7 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
                 album = self.get_album(album_resp['browseId'])
                 for track in album['tracks']:
                     if track['videoId'] == video_id:
-                        true_album = album_resp['browseId']
+                        true_album = album_resp['browseId'], track
                         break
                 if true_album:
                     break
@@ -125,7 +133,7 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
                 single = self.get_album(single_resp['browseId'])
                 for track in single['tracks']:
                     if track['videoId'] == video_id:
-                        true_album = single_resp['browseId']
+                        true_album = single_resp['browseId'], track
                         break
                 if true_album:
                     break
@@ -134,11 +142,11 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
             search = self.get_search(f"{artist_info['name']} - {song_info['videoDetails']['title']}", "songs", limit=20)
             for result in search:
                 if true_id in [a['id'] for a in result['artists']] and result['videoId'] == video_id:
-                    return result['album']['id']
+                    return result['album']['id'], result
             logging.warning("Using slightly inaccurate guesser")
             for result in search:
                 if true_id in [a['id'] for a in result['artists']] and result['title'] in song_info['videoDetails']['title']:
-                    return result['album']['id']
+                    return result['album']['id'], result
             return None
         
         else:

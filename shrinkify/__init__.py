@@ -44,7 +44,9 @@ class Shrinkify(object):
 
     def shrink_directory(self, directory: os.PathLike | str, update=False, continue_from: None | os.PathLike | str = None):
         pathdir = pathlib.Path(directory)
-        valid_files = sorted(filter(lambda f: not set(self.config.general.exclude_filter).intersection(f.parts) and f.is_file() and f.suffix in self.config.general.input_types, pathdir.rglob("*")))
+        valid_files = sorted(filter(lambda f: not set(self.config.general.exclude_filter).intersection(f.parts) and f.is_file() and f.suffix in self.config.general.input_types and ((not self.get_output_file(f).resolve().exists()) or update), pathdir.rglob("*")))
+        #TODO: Force conversion
+        logging.debug(tuple(valid_files))
         skip = continue_from is not None
         for fileno, file in enumerate(valid_files):
             if skip:
@@ -52,8 +54,6 @@ class Shrinkify(object):
                     skip = False
                 else:
                     continue
-            if not update and self.get_output_file(file).is_file(): #TODO: force
-                continue
             logging.info(f"Converting {file.name} ({fileno+1}/{len(valid_files)})")
             self.shrink_file(file, update=update)
 
@@ -106,7 +106,10 @@ class Shrinkify(object):
                 for k, v in meta.items():
                     if k[0] == "_":
                         continue
-                    muta_file[k] = v
+                    try:
+                        muta_file[k] = v
+                    except mutagen.easymp4.EasyMP4KeyError as e:
+                        logging.error(f"{type(e).__name__} {e}")
                 muta_file.save()
             else:
                 raise RuntimeError(f"Unsupported output format for mutagen metadata: {self.config.general.output_type}")
