@@ -4,6 +4,7 @@ from . import file
 from . import youtube
 from . import caching
 from . import youtubemusic
+from . import acoustid_mb
 from abc import ABC, abstractmethod
 #TODO: Make this not bad
 class MetadataHandler(ABC):
@@ -23,6 +24,7 @@ class MetadataParser(object):
         self.test_file = file.FileMetadata(self.conf)
         self.test_youtube = youtube.YoutubeMetadata(self.conf, self.cache)
         self.test_ytm = youtubemusic.YoutubeMusicMetadata(self.conf, self.cache)
+        self.test_acoustid = acoustid_mb.AcoustIDMetadata(self.conf, self.cache)
     
     def register_defaults(self):
         #self.registered_handlers.append()
@@ -30,7 +32,9 @@ class MetadataParser(object):
     
     def parse(self, file: pathlib.Path):
         out = None
-        if self.test_ytm.check_valid(file):
+        if not out and self.test_acoustid.check_valid(file):
+            out = self.test_acoustid.fetch(file)
+        if not out and self.test_ytm.check_valid(file):
             out = self.test_ytm.fetch(file)
         if not out and self.test_youtube.check_valid(file):
             out = self.test_youtube.fetch(file)

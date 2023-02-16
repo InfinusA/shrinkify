@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import logging
 import pathlib
 import os
 class ConfigGroup:
@@ -46,10 +47,19 @@ class YoutubeMusicMetadata(ConfigGroup):
     filename_regex: tuple[str, ...] = (r"-([a-zA-Z0-9\-_]{11})\.", r"\[([a-zA-Z0-9\-_]{11})\].")
 
 @dataclass
+class AcoustIDMetadata(ConfigGroup):
+    api_key: str | None = None
+    allow_missing_image: bool = False
+    score_threshold: float = 0.6
+    special_exclude: tuple[str, ...] = tuple()
+    musicbrainz_agent: str = "Shrinkify/0.1.0 ( aipacifico24@gmail.com )"
+
+@dataclass
 class Metadata(ConfigGroup):
     youtubemusic: YoutubeMusicMetadata = YoutubeMusicMetadata()
     youtube: YoutubeMetadata = YoutubeMetadata()
     file: FileMetadata = FileMetadata()
+    acoustid: AcoustIDMetadata = AcoustIDMetadata()
 
 @dataclass
 class Config(ConfigGroup):
@@ -60,3 +70,13 @@ class Config(ConfigGroup):
 def generate_default():
     conf = Config()
     return conf
+
+def load_dict(data: dict, conf: ConfigGroup):
+    for key in data.keys():
+        if not isinstance(key, str) or not hasattr(conf, key):
+            logging.warning(f"Invalid key: {key}")
+            continue
+        if isinstance(data[key], dict):
+            load_dict(data[key], getattr(conf, key))
+        else:
+            setattr(conf, key, data[key])

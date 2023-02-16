@@ -1,4 +1,5 @@
 import argparse
+import json
 import pathlib
 import sys
 import logging
@@ -30,6 +31,12 @@ class RecursiveNamespace(argparse.Namespace):
 class CommandLineExec(object):
     def __init__(self, conf: config.Config) -> None:
         self.conf = conf
+        #load config file
+        config_file = pathlib.Path("~/.config/shrinkify/config.json").expanduser()
+        if config_file.exists():
+            data = json.loads(config_file.read_text())
+            config.load_dict(data, self.conf)
+            logging.debug(f"Post-config file configuration: {self.conf}")
         
     def add_general_opts(self, parser: argparse.ArgumentParser):
         parser.add_argument("-s", "-r", "--root", "--source", dest="c.general.root", type=pathlib.Path, default=self.conf.general.root)
