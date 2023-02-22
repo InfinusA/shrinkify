@@ -26,13 +26,13 @@ class Shrinkify(object):
     """
     def __init__(self, config: config.Config) -> None:
         #TODO: check for relativity
-        self.root = pathlib.Path(config.general.root).resolve()
-        self.output = pathlib.Path(config.general.output).resolve()
+        self.root = pathlib.Path(config.general.root)
+        self.output = pathlib.Path(config.general.output)
         self.config = config
         self.metaprocessor = metadata.MetadataParser(self.config)
     
     def get_output_file(self, file: os.PathLike | str) -> pathlib.Path:
-        pfile = pathlib.Path(file).resolve()
+        pfile = pathlib.Path(file)
         if pfile.is_absolute():
             if not pfile.is_relative_to(self.root):
                 raise RuntimeError(f"File {pfile} is not relative to the music root {self.root}")
@@ -41,10 +41,19 @@ class Shrinkify(object):
             #assume relative to root
             logging.debug(f"Assuming file {pfile} is relative to root")
             return pathlib.Path(self.root, pfile).with_suffix(self.config.general.output_type)
+    
+    def is_valid_file(self, file: pathlib.Path, update=False):
+        if set(file.parts).intersection(self.config.general.exclude_filter):
+            return False
+        if file.suffix not in self.config.general.input_types:
+            return False
+        if self.get_output_file(file).exists() and not update:
+            return False
+        return True
 
     def shrink_directory(self, directory: os.PathLike | str, update=False, continue_from: None | os.PathLike | str = None):
         pathdir = pathlib.Path(directory)
-        valid_files = sorted(filter(lambda f: not set(self.config.general.exclude_filter).intersection(f.parts) and f.is_file() and f.suffix in self.config.general.input_types and ((not self.get_output_file(f).resolve().exists()) or update), pathdir.rglob("*")))
+        valid_files = sorted(filter(lambda f: self.is_valid_file(f, update=update), pathdir.rglob("*")))
         #TODO: Force conversion
         logging.debug(tuple(valid_files))
         skip = continue_from is not None
@@ -59,7 +68,7 @@ class Shrinkify(object):
 
     def shrink_file(self, filename: os.PathLike | str, update: bool = False):
         #resolve file before processing
-        file = pathlib.Path(filename).expanduser().resolve()
+        file = pathlib.Path(filename).expanduser()
 
         #updating runs inplace, so find the child file and use it as the source
         if update and not file.is_relative_to(self.output):
@@ -74,7 +83,7 @@ class Shrinkify(object):
         logging.debug(f"{file.name}: metadata: {meta}")
         convert_cmd = []
         convert_cmd.extend(copy.copy(self.config.conversion.pre_args))
-        convert_cmd.extend(['-i', str(file.expanduser().resolve()), '-i', '-'])
+        convert_cmd.extend(['-i', str(file.expanduser()), '-i', '-'])
         convert_cmd.extend(copy.copy(self.config.conversion.mid_args))
         if update:
             convert_cmd.extend(['-a:c', 'copy'])
@@ -85,7 +94,7 @@ class Shrinkify(object):
                 if isinstance(v, list): #multi-value tags
                     v = ", ".join(v)
                 convert_cmd.extend(['-metadata', f"{k}={v}"])
-        convert_cmd.append(str(output.expanduser().resolve()))
+        convert_cmd.append(str(output.expanduser()))
         logging.debug(f"{file.name}: command list: {convert_cmd}")
         logging.info(f"{file.name}: beginning conversion")
 
@@ -100,7 +109,7 @@ class Shrinkify(object):
         if MUTAGEN_ENABLED:
             logging.debug("starting mutagen metadata adder thing")
             if self.config.general.output_type == '.m4a':
-                muta_file = mutagen.easymp4.EasyMP4(output.expanduser().resolve())
+                muta_file = mutagen.easymp4.EasyMP4(output.expanduser())
                 for k, v in MUTAGEN_KEY_CONVERSION.items():
                     muta_file.RegisterTextKey(k, v)
                 for k, v in meta.items():
@@ -116,7 +125,7 @@ class Shrinkify(object):
         
         logging.info(f"{file.name}: finished conversion")
 
-        real_output = self.get_output_file(file).resolve()
+        real_output = self.get_output_file(file)
         real_output.parent.mkdir(parents=True, exist_ok=True)
         try:
             output.rename(real_output)

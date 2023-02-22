@@ -14,9 +14,9 @@ class ConfigGroup:
 
 @dataclass
 class General(ConfigGroup):
-    root: os.PathLike | str = pathlib.Path("~/Music").expanduser()
-    output: os.PathLike | str = pathlib.Path("~/Music/compressed").expanduser()
-    cache_dir: os.PathLike | str = pathlib.Path("~/.cache/shrinkify").expanduser()
+    root: os.PathLike | str = pathlib.Path("~/Music/").expanduser()
+    output: os.PathLike | str = pathlib.Path("~/Music/compressed/").expanduser()
+    cache_dir: os.PathLike | str = pathlib.Path("~/.cache/shrinkify/").expanduser()
     cache_file: os.PathLike | str = pathlib.Path("~/.cache/shrinkify/cache.sqlite").expanduser()
     input_types: tuple[str, ...] = ('.mp3', '.mp4', '.mkv', '.webm', '.m4a', '.aac', '.wav', '.ogg', '.opus', '.flac')
     output_type: str = '.m4a'

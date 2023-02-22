@@ -12,7 +12,7 @@ class FileMetadata(object):
     def fetch(self, file, no_thumb=False):
         if not isinstance(file, pathlib.Path):
             file = pathlib.Path(file)
-        file_metadata_raw = subprocess.check_output(FFPROBE_METADATA+[str(file.resolve())]).decode('utf8')
+        file_metadata_raw = subprocess.check_output(FFPROBE_METADATA+[str(file)]).decode('utf8')
         file_metadata = json.loads(file_metadata_raw)
         tags = file_metadata['format']['tags'] if 'tags' in file_metadata['format'].keys() else {}
         #remove stuff that's probably not wanted in the output
@@ -26,7 +26,7 @@ class FileMetadata(object):
         if not no_thumb:
             try:
                 this_thumbnail_command = FFMPEGTHUMBNAILER
-                this_thumbnail_command[2] = str(file.resolve())
+                this_thumbnail_command[2] = str(file)
                 thumbnail_raw = subprocess.check_output(this_thumbnail_command, stderr=subprocess.DEVNULL)
                 thumbnail = shrink_utils.data_to_thumbnail(thumbnail_raw)
             except subprocess.CalledProcessError:

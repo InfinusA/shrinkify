@@ -41,7 +41,7 @@ class Shrinkify(object):
             
     def recursive_convert(self, flist=None, show_metadata=False):
         root = ShrinkifyConfig.source_folder
-        output_folder = pathlib.Path(root, 'compressed').expanduser().resolve() if not isinstance(ShrinkifyConfig.output_folder, pathlib.Path) else ShrinkifyConfig.output_folder
+        output_folder = pathlib.Path(root, 'compressed').expanduser() if not isinstance(ShrinkifyConfig.output_folder, pathlib.Path) else ShrinkifyConfig.output_folder
         continue_flag = False
         if flist is None:
             flist = tuple(root.rglob("*"))
@@ -50,7 +50,7 @@ class Shrinkify(object):
         flist = sorted(flist)
         for file_index, file in enumerate(flist):
             if ShrinkifyConfig.Runtime.continue_from is not None and not continue_flag: #we are doing a continue and it hasn't been disabled
-                if file.resolve() == pathlib.Path(ShrinkifyConfig.Runtime.continue_from).expanduser().resolve():
+                if file == pathlib.Path(ShrinkifyConfig.Runtime.continue_from).expanduser():
                     continue_flag = True
                 else:
                     continue
@@ -88,14 +88,14 @@ class Shrinkify(object):
 
             ffmpeg_input = output_file if ShrinkifyConfig.Shrinkify.update_metadata and output_file.exists() else file
             ffmpeg_args = ['ffmpeg', '-hide_banner', '-y', 
-                '-i', str(ffmpeg_input.resolve()), '-i', '-', 
+                '-i', str(ffmpeg_input), '-i', '-', 
                 '-map', '0:a:0', '-map', '1', '-c:v', 'copy', '-disposition:v:0', 'attached_pic', '-c:a']
             ffmpeg_args.append("copy" if ShrinkifyConfig.Shrinkify.update_metadata and output_file.exists() else "aac")
                 
             for metadata_val in metadata_list:
                 ffmpeg_args.append('-metadata')
                 ffmpeg_args.append(metadata_val)
-            ffmpeg_args.append(str(tmp_file.resolve()))
+            ffmpeg_args.append(str(tmp_file))
             
             print("Converting File")
             if ShrinkifyConfig.debug:
@@ -110,11 +110,11 @@ class Shrinkify(object):
             ffmpeg.communicate()
             logging.info("Finished conversion")
             try:
-                tmp_file.rename(output_file.resolve())
+                tmp_file.rename(output_file)
             except FileExistsError:
                 output_file.rename("_"+str(output_file.resolve))
-                tmp_file.rename(output_file.resolve())
-                pathlib.Path("_"+str(output_file.resolve())).unlink(missing_ok=True)
+                tmp_file.rename(output_file)
+                pathlib.Path("_"+str(output_file)).unlink(missing_ok=True)
             time.sleep(ShrinkifyConfig.Shrinkify.throttle_length)
             print()
         

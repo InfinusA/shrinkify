@@ -91,7 +91,7 @@ class PlaylistModifier(object):
 
 class PlaylistGenerator(object):
     def __init__(self) -> None:
-        self.playlist_root = pathlib.Path(ShrinkifyConfig.output_folder).resolve()
+        self.playlist_root = pathlib.Path(ShrinkifyConfig.output_folder)
         self.exclude = ShrinkifyConfig.Playlist.exclude
         self.filetypes = ShrinkifyConfig.filetypes
         self.metadata = FileMetadata()

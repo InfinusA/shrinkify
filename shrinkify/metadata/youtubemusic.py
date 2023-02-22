@@ -98,9 +98,12 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
         if 'albums' in artist_info:
             temp_album = self.get_album(artist_info['albums']['results'][0]['browseId'])
             for artist in temp_album['artists']:
-                if self.get_artist(artist['id'])['channelId'] == artist_info['channelId']:
-                    true_id = artist['id']
-                    break
+                try:
+                    if self.get_artist(artist['id'])['channelId'] == artist_info['channelId']:
+                        true_id = artist['id']
+                        break
+                except AttributeError:#deleted artist??
+                    return None
         if not true_id and 'singles' in artist_info:
             temp_album = self.get_album(artist_info['singles']['results'][0]['browseId'])
             for artist in temp_album['artists']:

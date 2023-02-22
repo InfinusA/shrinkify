@@ -76,7 +76,7 @@ class CommandLineExec(object):
             shrink.shrink_directory(self.conf.general.root, update=parse_namespace.in_place, continue_from=parse_namespace.continue_from)
         else:
             for file in parse_namespace.files:
-                file = pathlib.Path(file).expanduser().resolve()
+                file = pathlib.Path(file).expanduser()
                 if file.is_dir():
                     shrink.shrink_directory(file, update=parse_namespace.in_place, continue_from=parse_namespace.continue_from)
                 elif file.is_file():
