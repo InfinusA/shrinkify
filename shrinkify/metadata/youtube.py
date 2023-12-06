@@ -3,16 +3,20 @@ import pathlib
 import re
 import requests
 import base64
+import logging
 from PIL import Image
 from dateutil import parser as dateparser
 import json
 from . import caching
 from .. import config
+from .. import songclass
+from . import file
 
 class VideoNotFoundException(Exception):
     pass
 
-class YoutubeMetadata(object):
+class YoutubeMetadata(file.MetadataParser):
+    identifier = "Youtube"
     def __init__(self, conf: config.Config, cache: caching.CacheConnector | None = None) -> None:
         self.conf = conf
         self.cache = cache.create_simple("youtubeMetadata") if cache is not None else None
@@ -20,15 +24,15 @@ class YoutubeMetadata(object):
             self.cache.load_generic_schema("video_id", "raw_data")
         self.session = requests.Session()
         if self.conf.metadata.youtube.api_key is None:
-            raise RuntimeError("Youtube API key not specified in config")
+            logging.warning("Youtube API key not specified in config")
         else:
             self.session.params['key'] = self.conf.metadata.youtube.api_key # type: ignore
                 
-    def check_valid(self, file: pathlib.Path):
+    def check_valid(self, song: songclass.Song):
         if not self.conf.metadata.youtube.api_key:
             return False
         for regex in self.conf.metadata.youtube.filename_regex:
-            if re.search(regex, file.name):
+            if re.search(regex, song.path.name):
                 return True
         return False
 
@@ -54,7 +58,7 @@ class YoutubeMetadata(object):
             except IndexError:
                 raise VideoNotFoundException()
             if self.cache:
-                self.cache.insert({'video_id': video_id, 'raw_data': base64.b64encode(raw).decode('utf8')})
+                self.cache.insert({'video_id': video_id, 'raw_data': base64.b64encode(raw).decode('utf8')}, key='video_id')
                 
         return data
     
@@ -77,27 +81,26 @@ class YoutubeMetadata(object):
                 pathlib.Path(self.conf.general.cache_dir, channel_id).with_suffix(".jpg").write_bytes(data)
             return data
     
-    def fetch(self, file: pathlib.Path):
-        video_id = self.get_id(file.name)
+    def fetch(self, song: songclass.Song) -> None | songclass.Song:
+        video_id = self.get_id(song.path.name)
         if not video_id:
-            return False
+            return None
         try:
             data = self.get_video_info(video_id)
         except VideoNotFoundException:
-            return False
+            return None
         snippet = data['snippet']
         video_date = dateparser.parse(snippet['publishedAt'])
-        output = {}
-        output['title'] = snippet['title']
-        output['album'] = self.conf.metadata.youtube.album_format.format(channelTitle=snippet['channelTitle'])
-        output['artist'] = snippet['channelTitle']
-        output['year'] = str(video_date.year)
-        output['date'] = video_date.strftime(r"%F-%m-%d")
-        output['comment'] = snippet['description']
+        song['title'] = snippet['title']
+        song['album'] = self.conf.metadata.youtube.album_format.format(channelTitle=snippet['channelTitle'])
+        song['artist'] = snippet['channelTitle']
+        song['year'] = str(video_date.year)
+        song['date'] = video_date.strftime(r"%F-%m-%d")
+        song['comment'] = snippet['description']
         idat = io.BytesIO()
         idat.write(self.get_channel_icon(snippet['channelId']))
         idat.seek(0)
-        output['_thumbnail_image'] = Image.open(idat)
-        
-        return output
+        song.cover_image = Image.open(idat)
+        song.parser = "Shrinkify/yt"
+        return song
         

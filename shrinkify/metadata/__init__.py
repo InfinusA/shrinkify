@@ -1,9 +1,13 @@
+import logging
 from .. import config
+from .. import songclass
+from .. import overrides
 import pathlib
 from . import file
 from . import youtube
 from . import caching
 from . import youtubemusic
+from . import niconico
 from . import acoustid_mb
 from abc import ABC, abstractmethod
 #TODO: Make this not bad
@@ -20,24 +24,37 @@ class MetadataParser(object):
     def __init__(self, conf: config.Config) -> None:
         self.conf = conf
         self.cache = caching.CacheConnector(self.conf)
-        self.registered_handlers = []
-        self.test_file = file.FileMetadata(self.conf)
-        self.test_youtube = youtube.YoutubeMetadata(self.conf, self.cache)
-        self.test_ytm = youtubemusic.YoutubeMusicMetadata(self.conf, self.cache)
-        self.test_acoustid = acoustid_mb.AcoustIDMetadata(self.conf, self.cache)
+        self.handlers: list[file.MetadataParser] = []
+        self.handler_list = (
+            file.FileMetadata(self.conf),
+            youtube.YoutubeMetadata(self.conf, self.cache),
+            niconico.NicoNicoMetadata(self.conf, self.cache),
+            youtubemusic.YoutubeMusicMetadata(self.conf, self.cache),
+            acoustid_mb.AcoustIDMetadata(self.conf, self.cache)
+        )
+        self.handlers = self.setup_handler_list(self.conf.metadata.identifiers)
     
-    def register_defaults(self):
-        #self.registered_handlers.append()
-        pass
+    def setup_handler_list(self, handlers: list[str] | tuple[str, ...]) -> list[file.MetadataParser]:
+        l = []
+        for identifier in handlers:
+            for handler in self.handler_list:
+                if handler.identifier == identifier:
+                    l.append(handler)
+        return l
+
     
-    def parse(self, file: pathlib.Path):
-        out = None
-        if not out and self.test_acoustid.check_valid(file):
-            out = self.test_acoustid.fetch(file)
-        if not out and self.test_ytm.check_valid(file):
-            out = self.test_ytm.fetch(file)
-        if not out and self.test_youtube.check_valid(file):
-            out = self.test_youtube.fetch(file)
-        if not out:
-            out = self.test_file.fetch(file)
-        return out
+    def parse(self, song: songclass.Song) -> songclass.Song:
+        localhandlers = self.setup_handler_list(overrides.Overrides(self.conf).override('metadata_handlers', song=song, parsers=self.conf.metadata.identifiers)['parsers'])
+        for handler in localhandlers:
+            if handler.check_valid(song):
+                res = handler.fetch(song)
+                if res in (None, False):
+                    if res is False:
+                        logging.warning("Returning `None` from a handler is now preferred to returning `False`.\nThis can be safely ignored by users")
+                    continue
+                song = res
+                break
+        #test
+        song = overrides.Overrides(self.conf).override('final_metadata', song=song)['song']
+        song = overrides.Overrides(self.conf).basic_override(song)
+        return song

@@ -11,8 +11,11 @@ import base64
 from PIL import Image
 from . import caching
 from .. import config
+from . import file
+from .. import songclass
 
-class YoutubeMusicMetadata(object):#MetadataHandler):
+class YoutubeMusicMetadata(file.MetadataParser):
+    identifier = "YoutubeMusic"
     def __init__(self, conf: config.Config, cache: caching.CacheConnector | None = None) -> None:
         self.conf = conf
         self.cache = cache
@@ -29,9 +32,9 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
             self.search_cache = self.cache.create_simple("ytmSearchCache")
             self.search_cache.load_schema("""CREATE TABLE IF NOT EXISTS ytmSearchCache(query STRING NOT NULL, filter STRING NOT NULL, raw_data STRING NOT NULL, PRIMARY KEY (query, filter));""")
     
-    def check_valid(self, file: pathlib.Path) -> bool:
+    def check_valid(self, song: songclass.Song) -> bool:
         for regex in self.conf.metadata.youtubemusic.filename_regex:
-            if re.search(regex, file.name):
+            if re.search(regex, song.path.name):
                 return True
         return False
     
@@ -42,10 +45,10 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
                 return r.group(1)
         return False
     
-    def fetch(self, file: pathlib.Path):
-        video_id = self.get_id(file.name)
+    def fetch(self, song: songclass.Song) -> None | songclass.Song:
+        video_id = self.get_id(song.path.name)
         if not video_id:
-            return False
+            return None
         album_id = identifier_info = None
         for res_func in (self.deadsimple_identifier,):
             res = res_func(video_id)
@@ -53,28 +56,28 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
                 album_id, identifier_info = res
                 break
         else:
-            return False
+            return None
+        
         album = self.get_album(album_id)
-        song = None
+        ytsong = None
         for track in album['tracks']:
             if track['videoId'] == video_id:
-                song = track
+                ytsong = track
                 break
         else:
             logging.warning("Using name-based rematching")
             song_title = identifier_info['title']
             for track in album['tracks']:
                 if track['title'] == song_title:
-                    song = track
+                    ytsong = track
                     break
             else:
                 logging.critical(album)
                 raise RuntimeError("Could not find song in identified album (see debug log)")
-        output = {}
-        output['title'] = song['title']
-        output['artist'] = [a['name'] for a in song['artists']]
-        output['album'] = album['title']
-        output['year'] = album['year']
+        song['title'] = ytsong['title']
+        song['artist'] = [a['name'] for a in ytsong['artists']]
+        song['album'] = album['title']
+        song['year'] = album['year']
     
         if tuple(pathlib.Path(self.conf.general.cache_dir).glob(f"{video_id}.*")):
             thumb_data = next(pathlib.Path(self.conf.general.cache_dir).glob(f"{video_id}.*")).read_bytes()
@@ -82,8 +85,9 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
             thumb_data = requests.get(max(album['thumbnails'], key=lambda t: t['height'])['url']).content
             if pathlib.Path(self.conf.general.cache_dir).is_dir():
                 pathlib.Path(self.conf.general.cache_dir, video_id).with_suffix(".jpg").write_bytes(thumb_data)
-        output['_thumbnail_image'] = Image.open(io.BytesIO(thumb_data))
-        return output
+        song.cover_image = Image.open(io.BytesIO(thumb_data))
+        song.parser = "Shrinkify/ytm"
+        return song
     
     def deadsimple_identifier(self, video_id: str) -> tuple[str, dict] | None:
         song_info = self.get_song(video_id)
@@ -94,12 +98,15 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
         except KeyError:
             #immersivemusicsomethingorother
             return None
+        if artist_info is None:
+            return None
         true_id = None
         if 'albums' in artist_info:
             temp_album = self.get_album(artist_info['albums']['results'][0]['browseId'])
             for artist in temp_album['artists']:
                 try:
-                    if self.get_artist(artist['id'])['channelId'] == artist_info['channelId']:
+                    new_artist = self.get_artist(artist['id'])
+                    if new_artist and new_artist['channelId'] == artist_info['channelId']:
                         true_id = artist['id']
                         break
                 except AttributeError:#deleted artist??
@@ -107,12 +114,14 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
         if not true_id and 'singles' in artist_info:
             temp_album = self.get_album(artist_info['singles']['results'][0]['browseId'])
             for artist in temp_album['artists']:
-                if self.get_artist(artist['id'])['channelId'] == artist_info['channelId']:
+                new_artist = self.get_artist(artist['id'])
+                if new_artist and new_artist['channelId'] == artist_info['channelId']:
                     true_id = artist['id']
                     break
         if not true_id and 'videos' in artist_info:
             for artist in artist_info['videos']['results'][0]['artists']:
-                if self.get_artist(artist['id'])['channelId'] == artist_info['channelId']:
+                new_artist = self.get_artist(artist['id'])
+                if new_artist and new_artist['channelId'] == artist_info['channelId']:
                     true_id = artist['id']
                     break
         if not true_id:
@@ -145,11 +154,14 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
             search = self.get_search(f"{artist_info['name']} - {song_info['videoDetails']['title']}", "songs", limit=20)
             for result in search:
                 if true_id in [a['id'] for a in result['artists']] and result['videoId'] == video_id:
+                    if 'album' not in result: #strange off-case
+                        continue
                     return result['album']['id'], result
-            logging.warning("Using slightly inaccurate guesser")
-            for result in search:
-                if true_id in [a['id'] for a in result['artists']] and result['title'] in song_info['videoDetails']['title']:
-                    return result['album']['id'], result
+            if self.conf.metadata.youtubemusic.use_very_inaccurate:
+                logging.warning("Using slightly inaccurate guesser")
+                for result in search:
+                    if true_id in [a['id'] for a in result['artists']] and result['title'] in song_info['videoDetails']['title']:
+                        return result['album']['id'], result
             return None
         
         else:
@@ -162,7 +174,7 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
             data = self.ytm.search(query, filter, limit=limit)
             if self.cache:
                 jsonified = base64.b64encode(json.dumps(data).encode("utf8")).decode("utf8")
-                self.search_cache.insert({"query": query, "filter": filter, "raw_data": jsonified})
+                self.search_cache.insert({"query": query, "filter": filter, "raw_data": jsonified}, key=('query', 'filter'))
         return data
 
     def get_song(self, video_id: str):
@@ -172,17 +184,19 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
             data = self.ytm.get_song(video_id)
             if self.cache:
                 jsonified = base64.b64encode(json.dumps(data).encode("utf8")).decode("utf8")
-                self.song_cache.insert({"video_id": video_id, "raw_data": jsonified})
+                self.song_cache.insert({"video_id": video_id, "raw_data": jsonified}, key='video_id')
         return data
 
-    def get_artist(self, channel_id: str):
+    def get_artist(self, channel_id: str) -> dict | None:
+        if not isinstance(channel_id, str):
+            return None
         if self.cache and self.artist_cache.contains(channel_id=channel_id):
             data = json.loads(base64.b64decode(self.artist_cache.fetch_one(channel_id=channel_id)['raw_data']))
         else:
             data = self.ytm.get_artist(channelId=channel_id)
             if self.cache:
                 jsonified = base64.b64encode(json.dumps(data).encode("utf8")).decode("utf8")
-                self.artist_cache.insert({"channel_id": channel_id, "raw_data": jsonified})
+                self.artist_cache.insert({"channel_id": channel_id, "raw_data": jsonified}, key='channel_id')
         return data
     
     def get_artist_albums(self, channel_id: str, params: str | None = None, singles: bool = False):
@@ -190,16 +204,20 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
         if self.cache and self.aa_cache.contains(channel_id=channel_id, mode=mode):
             data = json.loads(base64.b64decode(self.aa_cache.fetch_one(channel_id=channel_id, mode=mode)['raw_data']))
         else:
-            if not params:
-                artistdata = self.ytm.get_artist(channel_id) #don't use cache for params as it will likely be invalid
-                if 'params' in artistdata[mode]:
-                    params = artistdata[mode]['params']
-                else:
-                    params = None
-            data = self.ytm.get_artist_albums(channel_id, params) #type:ignore
+            artistdata = self.ytm.get_artist(channel_id) #don't use cache for params as it will likely be invalid
+            browse_id = artistdata[mode]['browseId']
+            if 'params' in artistdata[mode]:
+                params = artistdata[mode]['params']
+            else:
+                params = None
+            try:
+                data = self.ytm.get_artist_albums(browse_id, params) #type:ignore
+            except KeyError:
+                logging.critical("The dreaded KeyError: gridRenderer has occurred. Returning an empty list")
+                return []
             if self.cache:
                 jsonified = base64.b64encode(json.dumps(data).encode("utf8")).decode("utf8")
-                self.aa_cache.insert({"channel_id": channel_id, "mode": mode, "raw_data": jsonified})
+                self.aa_cache.insert({"channel_id": channel_id, "mode": mode, "raw_data": jsonified}, key=('channel_id', 'mode'))
         return data
 
     def get_album(self, browse_id: str):
@@ -209,6 +227,6 @@ class YoutubeMusicMetadata(object):#MetadataHandler):
             data = self.ytm.get_album(browseId=browse_id)
             if self.cache:
                 jsonified = base64.b64encode(json.dumps(data).encode("utf8")).decode("utf8")
-                self.album_cache.insert({"browse_id": browse_id, "raw_data": jsonified})
+                self.album_cache.insert({"browse_id": browse_id, "raw_data": jsonified}, key='browse_id')
         return data
         
