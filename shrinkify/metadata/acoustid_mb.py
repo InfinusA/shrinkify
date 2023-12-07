@@ -48,21 +48,25 @@ class AcoustIDMetadata(file.MetadataParser):
             
     def fetch(self, song: songclass.Song) -> bool | songclass.Song:
         #get musicbrainz id
-        if self.cache and self.cache.contains(relativePath=str(song.path.relative_to(self.conf.general.root))):
-            acoustid_resp = self.uncache(self.cache.fetch_one(relativePath=str(song.path.relative_to(self.conf.general.root)))['data'])
+        if self.cache2 and self.cache2.contains(relativePath=str(song.path.relative_to(self.conf.general.root))):
+            acoustid_rresp: dict = self.uncache(self.cache2.fetch_one(relativePath=str(song.path.relative_to(self.conf.general.root)))['data'])
         else:
-            acoustid_resp = tuple(acoustid.match(self.conf.metadata.acoustid.api_key, str(song.path.expanduser())))
-            if self.cache:
-                self.cache.insert({'relativePath': str(song.path.relative_to(self.conf.general.root)), 'data': self.cachify(acoustid_resp)}, key='relativePath')
+            acoustid_rresp: dict = acoustid.match(self.conf.metadata.acoustid.api_key, str(song.path.expanduser()), parse=False, meta=['recordings', 'sources']) #type:ignore
+            if self.cache2:
+                self.cache2.insert({'relativePath': str(song.path.relative_to(self.conf.general.root)), 'data': self.cachify(acoustid_rresp)}, key='relativePath')
         #get actual metadata
-        acoustid_resp = sorted(acoustid_resp, key=lambda t: t[0], reverse=True)
+        full_list = []
+        for result in acoustid_rresp['results']:
+            for recording in result['recordings']:
+                full_list.append(((result['score'], recording['sources']), recording['id']))
+        acoustid_resp = sorted(full_list, key=lambda t: t[0], reverse=True)
         if not acoustid_resp:
             return False
         logging.debug(acoustid_resp)
         recording = release = None
         
         for match in acoustid_resp:
-            if match[0] < self.conf.metadata.acoustid.score_threshold:
+            if match[0][0] < self.conf.metadata.acoustid.score_threshold:
                 return False
             
             if self.rec_cache and self.rec_cache.contains(id=match[1]):
